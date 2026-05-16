@@ -129,6 +129,12 @@ def create_invite_token(user_id: str) -> str:
         "exp": datetime.now(timezone.utc) + timedelta(days=7),
     }, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
+def create_verify_token(user_id: str) -> str:
+    return jwt.encode({
+        "sub": user_id, "type": "email_verify",
+        "exp": datetime.now(timezone.utc) + timedelta(days=7),
+    }, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
 def set_auth_cookie(response: Response, token: str):
     response.set_cookie(
         key="access_token",
@@ -332,6 +338,7 @@ class JobIn(BaseModel):
     customer_id: Optional[str] = None
     customer_name: Optional[str] = ""
     customer_phone: Optional[str] = ""
+    customer_email: Optional[str] = ""
     address: Optional[str] = ""
     job_type: str = "HVAC"
     assigned_to: Optional[str] = None
@@ -339,6 +346,9 @@ class JobIn(BaseModel):
     duration_min: int = 60
     price: float = 0.0
     status: Literal["unscheduled", "scheduled", "in_progress", "completed", "cancelled"] = "unscheduled"
+
+class GoogleExchangeIn(BaseModel):
+    session_id: str
 
 class JobUpdate(BaseModel):
     title: Optional[str] = None
@@ -433,6 +443,89 @@ async def logout(request: Request, response: Response):
 async def me(user: dict = Depends(get_current_user)):
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0}) if user.get("company_id") else None
     return {"user": user, "company": company, "permissions": PERMISSIONS.get(user["role"], [])}
+
+@api.post("/auth/verify")
+async def verify_email(token: str = Query(...)):
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "email_verify":
+            raise HTTPException(status_code=400, detail="Invalid token")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=400, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=400, detail="Invalid token")
+    res = await db.users.update_one({"id": payload["sub"]}, {"$set": {"email_verified": True}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"ok": True}
+
+@api.post("/auth/verify/resend")
+async def verify_resend(user: dict = Depends(get_current_user)):
+    if user.get("email_verified"):
+        return {"ok": True, "already_verified": True}
+    verify_url = f"{FRONTEND_URL}/verify?token={create_verify_token(user['id'])}"
+    email_id = await send_email(
+        user["email"], "Verify your A1 Field Pro email",
+        email_layout("Verify your email",
+            f"<p>Hi {user['name']}, please verify this email so you can receive invoices and booking confirmations.</p>",
+            "Verify email", verify_url),
+    )
+    return {"ok": True, "verify_url": verify_url, "email_sent": bool(email_id)}
+
+@api.post("/auth/google/exchange")
+async def google_exchange(body: GoogleExchangeIn, request: Request, response: Response):
+    try:
+        r = requests.get(
+            "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
+            headers={"X-Session-ID": body.session_id}, timeout=15,
+        )
+        r.raise_for_status()
+        info = r.json()
+    except Exception as e:
+        logger.error(f"Google session-data failed: {e}")
+        raise HTTPException(status_code=400, detail="Could not verify Google session")
+    email = (info.get("email") or "").lower().strip()
+    if not email:
+        raise HTTPException(status_code=400, detail="Google did not return an email")
+    user = await db.users.find_one({"email": email})
+    now = now_iso()
+    if not user:
+        # New Google sign-up — create as customer with no company.
+        uid = str(uuid.uuid4())
+        new_user = {
+            "id": uid, "company_id": None,
+            "name": info.get("name") or email.split("@")[0],
+            "email": email,
+            "password_hash": hash_password(pysecrets.token_urlsafe(16)),  # random; user uses Google
+            "role": "customer", "active": True,
+            "mfa_enabled": False, "mfa_secret": None,
+            "email_verified": True, "google_linked": True,
+            "picture": info.get("picture") or "",
+            "created_at": now,
+        }
+        await db.users.insert_one(new_user)
+        new_user.pop("_id", None)
+        user = new_user
+        await log_activity(user, "auth.google.signup")
+    else:
+        await db.users.update_one(
+            {"id": user["id"]},
+            {"$set": {"google_linked": True, "email_verified": True,
+                      "picture": info.get("picture") or user.get("picture", "")}},
+        )
+        user = await db.users.find_one({"id": user["id"]})
+    if not user.get("active", True):
+        raise HTTPException(status_code=403, detail="Account deactivated")
+    # MFA still applies for non-customer roles
+    if user.get("mfa_enabled"):
+        # Sign them in without a fresh-cookie until they verify the TOTP step on /login
+        raise HTTPException(status_code=401, detail="mfa_required")
+    sid = await create_session(user, request)
+    token = create_access_token(user["id"], user.get("company_id"), user["role"], sid)
+    set_auth_cookie(response, token)
+    user.pop("password_hash", None); user.pop("mfa_secret", None); user.pop("_id", None)
+    await log_activity(user, "auth.google.login")
+    return {"user": user, "token": token}
 
 # -------------------- Password reset --------------------
 @api.post("/auth/forgot")
@@ -1033,6 +1126,25 @@ async def public_company(company_id: str):
         raise HTTPException(status_code=404, detail="Company not found")
     return company
 
+# -------------------- Customer Portal --------------------
+@api.get("/portal/jobs")
+async def portal_jobs(user: dict = Depends(get_current_user)):
+    if user["role"] != "customer":
+        raise HTTPException(status_code=403, detail="Customer-only")
+    items = await db.jobs.find(
+        {"customer_email": user["email"]}, {"_id": 0}
+    ).sort("created_at", -1).to_list(200)
+    return items
+
+@api.get("/portal/companies")
+async def portal_companies(user: dict = Depends(get_current_user)):
+    if user["role"] != "customer":
+        raise HTTPException(status_code=403, detail="Customer-only")
+    # Distinct company ids from this customer's jobs
+    company_ids = await db.jobs.distinct("company_id", {"customer_email": user["email"]})
+    items = await db.companies.find({"id": {"$in": company_ids}}, {"_id": 0, "owner_id": 0}).to_list(50)
+    return items
+
 @api.post("/public/companies/{company_id}/bookings")
 async def public_booking(company_id: str, body: BookingIn):
     company = await db.companies.find_one({"id": company_id}, {"_id": 0})
@@ -1056,6 +1168,7 @@ async def public_booking(company_id: str, body: BookingIn):
         "customer_id": cust["id"],
         "customer_name": body.name,
         "customer_phone": body.phone,
+        "customer_email": body.email,
         "address": body.address,
         "job_type": body.job_type,
         "assigned_to": None,

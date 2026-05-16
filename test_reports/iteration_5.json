@@ -1,0 +1,49 @@
+{
+  "summary": "Phase 2C validated end-to-end. Backend: 14 new pytest cases in /app/backend/tests/test_phase2c.py — registration email_verified=false, /auth/verify (valid+invalid token), /auth/verify/resend (auth-gated + idempotent already_verified), Google /auth/google/exchange (bad-session 400 + mocked happy-path that creates customer with company_id=null, role=customer, email_verified=true, google_linked=true), /portal/jobs (403 for owner/tech, 401 unauth, 200 for customer with cross-tenant scoping by email), /portal/companies (distinct companies, _id stripped), public booking persists customer_email to mongo (verified via direct DB read since endpoint returns only {ok,job_id,company_name}). All 77 backend tests pass (63 prior + 14 new). Frontend: /login shows Continue with Google, /register shows Continue with Google + customer helper text, /verify?token=bad renders 'Verification failed', /portal (anon) shows portal-google-login card, BookingWidget submit button applies branding.accent_color via inline style (verified rgb(249,115,22) for orange #F97316 after PATCH /api/companies/me). AuthCallback hash-guard short-circuits to spinner when window.location.hash contains session_id (code-reviewed; not exercised since no real Emergent session).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/register", "issue": "Spec says response should include verify_url, but current implementation returns only {user, token}. Email best-effort send happens via Resend but the verify_url is NOT included in the register response — clients have to call /auth/verify/resend explicitly to retrieve it. Minor mismatch with the Phase 2C requirements doc."},
+      {"endpoint": "/api/public/companies/{id}/bookings", "issue": "Response returns only {ok, job_id, company_name} — customer_email is persisted to DB but not echoed back. UI/integrations consuming the response cannot confirm it was stored without an additional fetch. Consider returning the full job object (with _id stripped) for consistency with internal POST /api/jobs."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "BookingWidget", "issues": ["Header 'Service request' overline uses primary_color via inline style — verified. Page lacks an obvious branded logo region when branding.logo_path is unset; fallback is OK but consider an industry-icon placeholder for visual polish."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase2c.py",
+    "/app/test_reports/pytest/phase2c_results.xml",
+    "/app/test_reports/pytest/all_results.xml"
+  ],
+  "action_items": [
+    "Optional: include verify_url in POST /api/auth/register response to match Phase 2C spec (currently only available via /auth/verify/resend after login).",
+    "Optional: have POST /api/public/companies/{id}/bookings return the full job object (minus _id) so the widget could show 'We received your request for HVAC at ...' confirmation deterministically.",
+    "Verify Banner could not be visually confirmed in browser because Layout's Protected wrapper redirects users with mfa_enabled=false to /setup-mfa BEFORE Layout renders (so VerifyBanner never gets a chance to render for fresh demo accounts). Code review confirms component is present with data-testid='verify-banner' and gated on email_verified=false. Main agent should manually test by enabling MFA on the demo owner and confirming the banner shows on /app/dashboard."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now 1417 lines — still well past the 700 threshold (refactor deferred per problem statement, but flagging again). Auth, MFA, sessions, activity, jobs, files, public booking, invoice PDF, portal, payments all live in one module.",
+    "POST /api/auth/google/exchange: external requests.get to Emergent has timeout=15 but no retry; if Emergent is briefly unavailable user gets a 400 with generic detail. Consider retry-once + clearer error code (502 Bad Gateway vs 400) when upstream is the failure point vs invalid session.",
+    "POST /api/auth/google/exchange: when an existing user is found, the code path unconditionally sets google_linked=True and email_verified=True. This is reasonable, but consider gating email_verified=True only when info.get('email_verified') is True from Google to avoid trusting an unverified Google account email.",
+    "/portal/jobs scopes by user.email only — does NOT also scope by company_id. This is intentional cross-tenant for the customer use-case but means a customer with the same email used by two companies will see both — confirm with product. Also recommend adding an index on jobs.customer_email for performance.",
+    "/auth/verify endpoint accepts ?token=... via query param but is a POST. RESTfully a verify-link from email is typically a GET so users clicking the email link in a browser would 405. The frontend /verify page handles this (posts via fetch), but if anyone curls the link directly it will fail.",
+    "Booking widget POST returns minimal payload (ok/job_id/company_name) — inconsistent with POST /api/jobs which returns the full job. Make it consistent and easier to test.",
+    "Customer-role users are created with company_id=None via Google signup. Several existing endpoints (/api/jobs, /api/dashboard etc) assume company_id is set — verify they all 403/skip cleanly when called by a customer (portal-only endpoints already gate on role)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase2c.py (new — 14 tests)",
+    "/app/test_reports/pytest/phase2c_results.xml (new)",
+    "/app/test_reports/pytest/all_results.xml (new)",
+    "/app/test_reports/iteration_5.json (new)"
+  ],
+  "success_rate": {"backend": "100% (14/14 new + 63/63 prior = 77/77)", "frontend": "100% on testable Phase 2C UI flows (Verify banner not exercisable due to MFA gate)"},
+  "test_credentials": "superadmin@a1fieldpro.com / Super1234! (super_admin), demo@a1fieldpro.com / Demo1234! (owner), tech@a1fieldpro.com / Demo1234! (technician). Fresh customer-role accounts created on the fly within tests using lowercase test_cust_* prefixes (cleaned up by autouse fixture).",
+  "seed_data_creation": "Autouse session fixture in test_phase2c.py resets mfa_enabled=False on the four seeded accounts at session start AND end. Deletes users matching ^(TEST_|test_) regex, jobs/customers with 'TEST' in name/title. Created/deleted lowercase test_g_*@example.com (Google), test_cust_*@example.com (Portal flow), TEST_be_*@example.com (booking email persistence) — all cleaned up post-session.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Phase 2C all 14 backend tests pass; all 77 tests green. test_phase2c.py uses pytest-asyncio (just installed via pip) — if you re-run, confirm pytest-asyncio is still installed (pip list | grep pytest-asyncio). The Google happy-path test imports the live server module IN-PROCESS and monkey-patches server.requests; this writes to the SAME MongoDB as the running uvicorn so test_g_*@example.com users appear in the live DB during the test run (cleanup fixture removes them). Verify Banner could not be exercised — the demo owner has mfa_enabled=False after every test run, so Layout's Protected wrapper redirects /app/dashboard → /setup-mfa before the banner renders. To smoke-test the banner, enable MFA on demo owner, sign in with TOTP, and confirm the amber banner with data-testid='verify-banner' shows above the dashboard, with a Resend button that posts to /api/auth/verify/resend and a dismiss X. Branding (primary/accent color) verified live on /book/{id}: rgb(249,115,22) applied to submit button after PATCH /api/companies/me — endpoint and UI both green.",
+  "rca of the issue": "No defects found in Phase 2C. Initial test failures were test-side mistakes: (1) email lowercase normalization in /auth/google/exchange caused TEST_g_xxx to come back as test_g_xxx — fixed test to use lowercase. (2) Public booking endpoint returns {ok,job_id,company_name} not full job — fixed test to verify customer_email via direct MongoDB read. (3) Created customer-user filter in test used the original mixed-case email but DB stored lowercase — fixed test email to lowercase. All adjustments are tests-only; no application code changes were required."
+}

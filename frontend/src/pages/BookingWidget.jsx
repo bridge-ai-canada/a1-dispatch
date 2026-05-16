@@ -11,6 +11,13 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 const TYPES = ["HVAC", "Plumbing", "Electrical", "Garage Doors", "Roofing", "Appliance Repair", "Other"];
 
+function isLightColor(hex) {
+    const m = (hex || "").match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+    if (!m) return false;
+    const [r, g, b] = [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
+    return (0.299*r + 0.587*g + 0.114*b) / 255 > 0.6;
+}
+
 export default function BookingWidget() {
     const { companyId } = useParams();
     const [company, setCompany] = useState(null);
@@ -53,14 +60,23 @@ export default function BookingWidget() {
         return <div className="min-h-screen flex items-center justify-center text-slate-500">Loading...</div>;
     }
 
+    const branding = company.branding || {};
+    const primary = branding.primary_color || "#1D4ED8";
+    const accent  = branding.accent_color  || "#DC2626";
+    const logoUrl = branding.logo_path ? `${API}/files/${branding.logo_path}` : null;
+
     return (
         <div className="min-h-screen bg-slate-50 py-12 px-4">
             <Toaster position="top-right" richColors />
             <div className="max-w-xl mx-auto">
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center gap-2 text-xs font-semibold tracking-[0.2em] uppercase text-[#1D4ED8]">
-                        <Wrench size={14} weight="duotone" /> Book a service
-                    </div>
+                    {logoUrl ? (
+                        <img src={logoUrl} alt={company.name} className="mx-auto mb-4 max-h-16" />
+                    ) : (
+                        <div className="inline-flex items-center gap-2 text-xs font-semibold tracking-[0.2em] uppercase" style={{ color: primary }}>
+                            <Wrench size={14} weight="duotone" /> Book a service
+                        </div>
+                    )}
                     <h1 className="font-display text-4xl font-extrabold tracking-tighter mt-3">{company.name}</h1>
                     <p className="text-slate-500 mt-2">{company.industry} · Request a callback in 2 minutes</p>
                 </div>
@@ -118,7 +134,8 @@ export default function BookingWidget() {
                                 className="mt-1 w-full border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]" />
                         </div>
                         <button type="submit" disabled={loading} data-testid="booking-submit-button"
-                            className="w-full flex items-center justify-center gap-2 bg-[#DC2626] text-white font-semibold py-3 hover:bg-[#B91C1C] disabled:opacity-60">
+                            style={{ background: accent }}
+                            className="w-full flex items-center justify-center gap-2 text-white font-semibold py-3 hover:opacity-90 disabled:opacity-60 transition-opacity">
                             {loading ? "Sending..." : <>Request service <ArrowRight weight="bold" /></>}
                         </button>
                     </form>

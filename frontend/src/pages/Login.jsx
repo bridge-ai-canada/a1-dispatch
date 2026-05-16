@@ -4,7 +4,8 @@ import { useAuth } from "../context/AuthContext";
 import { formatApiError } from "../lib/api";
 import Brand from "../components/Brand";
 import { toast } from "sonner";
-import { ShieldCheck } from "@phosphor-icons/react";
+import { ShieldCheck, GoogleLogo } from "@phosphor-icons/react";
+import { startGoogleLogin } from "./AuthCallback";
 
 export default function Login() {
     const { login } = useAuth();
@@ -66,7 +67,15 @@ export default function Login() {
                     </h1>
 
                     {step === "creds" ? (
-                        <form onSubmit={submitCreds} className="mt-8 space-y-4" data-testid="login-form">
+                        <>
+                        <button onClick={() => startGoogleLogin("/auth/callback")} type="button" data-testid="google-login-button"
+                            className="mt-8 w-full flex items-center justify-center gap-2 border border-slate-300 px-4 py-2.5 hover:bg-slate-50 font-semibold text-sm">
+                            <GoogleLogo size={18} weight="bold" /> Continue with Google
+                        </button>
+                        <div className="my-4 flex items-center gap-3 text-xs text-slate-400 uppercase tracking-wider">
+                            <div className="flex-1 h-px bg-slate-200" />or<div className="flex-1 h-px bg-slate-200" />
+                        </div>
+                        <form onSubmit={submitCreds} className="space-y-4" data-testid="login-form">
                             <div>
                                 <label className="text-xs font-medium text-slate-700">Email</label>
                                 <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
@@ -86,6 +95,7 @@ export default function Login() {
                                 {loading ? "Signing in..." : "Sign in"}
                             </button>
                         </form>
+                        </>
                     ) : (
                         <form onSubmit={submitMfa} className="mt-8 space-y-4" data-testid="mfa-form">
                             <div className="flex items-start gap-3 p-3 bg-blue-50 border-l-2 border-[#1D4ED8] text-sm">

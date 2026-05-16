@@ -21,6 +21,17 @@ import ResetPassword from "./pages/ResetPassword";
 import SetupMFA from "./pages/SetupMFA";
 import AdminUsers from "./pages/AdminUsers";
 import Activity from "./pages/Activity";
+import AuthCallback from "./pages/AuthCallback";
+import VerifyEmail from "./pages/VerifyEmail";
+import Portal from "./pages/Portal";
+
+function HashGuard({ children }) {
+    // Per Emergent Auth playbook: detect session_id synchronously during render
+    if (typeof window !== "undefined" && window.location.hash?.includes("session_id=")) {
+        return <AuthCallback />;
+    }
+    return children;
+}
 
 function HomeRouter() {
     const { user, loading } = useAuth();
@@ -34,6 +45,7 @@ function App() {
         <AuthProvider>
             <BrowserRouter>
                 <Toaster position="top-right" richColors />
+                <HashGuard>
                 <Routes>
                     <Route path="/" element={<HomeRouter />} />
                     <Route path="/login" element={<Login />} />
@@ -41,6 +53,9 @@ function App() {
                     <Route path="/forgot" element={<ForgotPassword />} />
                     <Route path="/reset" element={<ResetPassword />} />
                     <Route path="/setup-mfa" element={<SetupMFA />} />
+                    <Route path="/verify" element={<VerifyEmail />} />
+                    <Route path="/auth/callback" element={<AuthCallback />} />
+                    <Route path="/portal" element={<Portal />} />
                     <Route path="/payment/result" element={<PaymentResult />} />
                     <Route path="/book/:companyId" element={<BookingWidget />} />
 
@@ -67,6 +82,7 @@ function App() {
 
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
+                </HashGuard>
             </BrowserRouter>
         </AuthProvider>
     );

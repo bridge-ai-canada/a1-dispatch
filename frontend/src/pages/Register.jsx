@@ -4,6 +4,8 @@ import { useAuth } from "../context/AuthContext";
 import { formatApiError } from "../lib/api";
 import Brand from "../components/Brand";
 import { toast } from "sonner";
+import { GoogleLogo } from "@phosphor-icons/react";
+import { startGoogleLogin } from "./AuthCallback";
 
 const INDUSTRIES = ["HVAC", "Plumbing", "Electrical", "Garage Doors", "Roofing", "Appliance Repair", "Home Services"];
 
@@ -41,6 +43,12 @@ export default function Register() {
                     <div className="overline">Start free trial</div>
                     <h1 className="font-display text-3xl font-extrabold tracking-tighter mt-2">Create your A1 Field Pro account</h1>
                     <p className="text-sm text-slate-500 mt-2">14-day free trial. No credit card required.</p>
+
+                    <button onClick={() => startGoogleLogin("/auth/callback")} type="button" data-testid="register-google-button"
+                        className="mt-6 w-full flex items-center justify-center gap-2 border border-slate-300 px-4 py-2.5 hover:bg-slate-50 font-semibold text-sm">
+                        <GoogleLogo size={18} weight="bold" /> Continue with Google
+                    </button>
+                    <p className="mt-1 text-xs text-slate-500">New Google accounts default to <strong>Customer</strong> role — perfect for homeowners.</p>
 
                     <form onSubmit={onSubmit} className="mt-8 space-y-4" data-testid="register-form">
                         <div className="grid grid-cols-2 gap-3">

@@ -4,9 +4,11 @@ import Brand from "./Brand";
 import {
     SquaresFour, Wrench, CalendarBlank, UsersThree,
     AddressBook, GearSix, SignOut, List, X, DeviceMobile,
-    ShieldCheck, ClockCounterClockwise, Buildings,
+    ShieldCheck, ClockCounterClockwise, Buildings, EnvelopeSimple,
 } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import api from "../lib/api";
+import { toast } from "sonner";
 
 const baseNav = [
     { to: "/app/dashboard", label: "Dashboard", icon: SquaresFour, roles: ["owner","dispatcher","office_manager","csr","sales_rep","accountant","technician"] },
@@ -110,6 +112,7 @@ export default function Layout() {
                 )}
 
                 <main className="flex-1 min-w-0 p-4 md:p-8">
+                    <VerifyBanner user={user} />
                     <Outlet />
                 </main>
             </div>
@@ -144,4 +147,35 @@ export function Protected({ children, roles }) {
         );
     }
     return children;
+}
+
+
+function VerifyBanner({ user }) {
+    const [dismissed, setDismissed] = useState(false);
+    const [resending, setResending] = useState(false);
+    if (!user || user.email_verified || dismissed) return null;
+    const resend = async () => {
+        setResending(true);
+        try {
+            const { data } = await api.post("/auth/verify/resend");
+            toast.success(data.email_sent ? "Verification email sent" : "Verification link refreshed (email not sent — Resend free tier)");
+        } catch {
+            toast.error("Could not resend");
+        } finally { setResending(false); }
+    };
+    return (
+        <div className="mb-6 p-3 border-l-2 border-amber-500 bg-amber-50 flex items-center justify-between gap-3" data-testid="verify-banner">
+            <div className="flex items-center gap-2 text-sm text-amber-900">
+                <EnvelopeSimple size={18} weight="duotone" />
+                <span>Verify <strong>{user.email}</strong> to receive invoices and booking confirmations.</span>
+            </div>
+            <div className="flex items-center gap-2">
+                <button onClick={resend} disabled={resending} data-testid="verify-resend-button"
+                    className="text-xs font-semibold px-3 py-1.5 bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60">
+                    {resending ? "Sending..." : "Resend"}
+                </button>
+                <button onClick={() => setDismissed(true)} aria-label="Dismiss" className="p-1"><X size={16} /></button>
+            </div>
+        </div>
+    );
 }
