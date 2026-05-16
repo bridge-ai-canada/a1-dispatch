@@ -14,6 +14,7 @@ const STATUS_COLORS = {
 
 export default function Customers() {
     const [items, setItems] = useState([]);
+    const [total, setTotal] = useState(0);
     const [q, setQ] = useState("");
     const [status, setStatus] = useState("");
     const [tag, setTag] = useState("");
@@ -26,7 +27,11 @@ export default function Customers() {
         if (q) params.set("q", q);
         if (status) params.set("status", status);
         if (tag) params.set("tag", tag);
-        api.get(`/customers?${params}`).then((r) => setItems(r.data)).finally(() => setLoading(false));
+        api.get(`/customers?${params}`).then((r) => {
+            // Response is now {items, total, has_more, limit, skip}
+            setItems(r.data.items || r.data);
+            setTotal(r.data.total ?? (Array.isArray(r.data) ? r.data.length : 0));
+        }).finally(() => setLoading(false));
     };
     useEffect(() => {
         const t = setTimeout(load, 250);
@@ -45,7 +50,7 @@ export default function Customers() {
                 <div>
                     <div className="overline">CRM</div>
                     <h1 className="font-display text-4xl font-extrabold tracking-tighter mt-1">Customers</h1>
-                    <p className="text-sm text-slate-500 mt-2">{items.length} {items.length === 1 ? "record" : "records"}</p>
+                    <p className="text-sm text-slate-500 mt-2">{total} {total === 1 ? "record" : "records"}{items.length < total && ` · showing ${items.length}`}</p>
                 </div>
                 <button onClick={() => setOpen(true)} data-testid="add-customer-button"
                     className="bg-[#DC2626] text-white px-5 py-2.5 font-semibold hover:bg-[#B91C1C] flex items-center gap-2">

@@ -134,10 +134,6 @@ export function Protected({ children, roles }) {
         window.location.href = "/login";
         return null;
     }
-    // MFA required for everyone (except super_admin can self-enable later)
-    if (!user.mfa_enabled && location.pathname !== "/setup-mfa") {
-        return <Navigate to="/setup-mfa" replace />;
-    }
     if (roles && !roles.includes(user.role)) {
         return (
             <div className="p-8 text-center">

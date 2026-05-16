@@ -5,15 +5,17 @@ const LOGO_URL = "https://customer-assets.emergentagent.com/job_a1-dispatch/arti
 export default function Brand({ size = "md", subtitle = false, variant = "default" }) {
     const { company } = useAuth?.() || { company: null };
     const branded = company?.branding || {};
-    const logoSrc = branded.logo_path
+    const useCompanyLogo = variant === "company" && branded.logo_path;
+    const logoSrc = useCompanyLogo
         ? `${process.env.REACT_APP_BACKEND_URL}/api/files/${branded.logo_path}`
         : LOGO_URL;
     const showCompanyName = variant === "company" && company?.name;
 
     const h = size === "lg" ? "h-12" : size === "sm" ? "h-7" : "h-9";
+    const text = size === "lg" ? "text-2xl" : size === "sm" ? "text-base" : "text-xl";
 
     return (
-        <div className="flex items-center gap-3" data-testid="brand-logo">
+        <div className="flex items-center gap-2.5" data-testid="brand-logo">
             <img src={logoSrc} alt="A1 Field Pro" className={`${h} w-auto`} />
             {showCompanyName ? (
                 <div className="leading-none">
@@ -21,7 +23,12 @@ export default function Brand({ size = "md", subtitle = false, variant = "defaul
                     {subtitle && <div className="overline mt-1">Powered by A1 Field Pro</div>}
                 </div>
             ) : (
-                subtitle && <div className="overline">by A1 HVAC N DE-GO</div>
+                <div className="leading-none">
+                    <div className={`font-display font-extrabold tracking-tighter ${text}`}>
+                        A1 <span className="text-[#DC2626]">FIELD</span> PRO
+                    </div>
+                    {subtitle && <div className="overline mt-1">by A1 HVAC N DE-GO</div>}
+                </div>
             )}
         </div>
     );

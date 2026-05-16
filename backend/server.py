@@ -61,6 +61,20 @@ def put_object(path: str, data: bytes, content_type: str) -> dict:
     r.raise_for_status()
     return r.json()
 
+def delete_object(path: str) -> bool:
+    key = init_storage()
+    if not key or not path:
+        return False
+    try:
+        r = requests.delete(
+            f"{STORAGE_URL}/objects/{path}",
+            headers={"X-Storage-Key": key}, timeout=30,
+        )
+        return r.status_code in (200, 204, 404)
+    except Exception as e:
+        logging.error(f"Storage delete failed for {path}: {e}")
+        return False
+
 def get_object(path: str):
     key = init_storage()
     if not key:
@@ -821,7 +835,7 @@ async def remove_team_member(user_id: str, user: dict = Depends(require_role("ow
 async def list_customers(
     user: dict = Depends(get_current_user),
     q: Optional[str] = None, status: Optional[str] = None, tag: Optional[str] = None,
-    limit: int = 200, skip: int = 0,
+    limit: int = 50, skip: int = 0,
 ):
     query = {"company_id": user["company_id"]}
     if status:
@@ -831,10 +845,11 @@ async def list_customers(
     if q:
         rx = {"$regex": q, "$options": "i"}
         query["$or"] = [{"name": rx}, {"phone": rx}, {"email": rx}, {"address": rx}]
+    total = await db.customers.count_documents(query)
     items = await db.customers.find(
         query, {"_id": 0}
     ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
-    return items
+    return {"items": items, "total": total, "has_more": skip + len(items) < total, "limit": limit, "skip": skip}
 
 @api.post("/customers")
 async def create_customer(body: CustomerIn, user: dict = Depends(get_current_user)):
@@ -1028,7 +1043,7 @@ async def customer_ai_summary(customer_id: str, user: dict = Depends(get_current
     jobs = await db.jobs.find({"customer_id": customer_id, "company_id": user["company_id"]}, {"_id": 0}).sort("created_at", -1).to_list(50)
     equip = await db.equipment.find({"customer_id": customer_id, "company_id": user["company_id"]}, {"_id": 0}).to_list(50)
     if not EMERGENT_KEY:
-        return {"summary": "AI summary unavailable (no LLM key configured).", "model": None}
+        return {"summary": "AI summary unavailable (no LLM key configured).", "model": None, "error_code": "no_key"}
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
         chat = LlmChat(
@@ -1049,10 +1064,11 @@ async def customer_ai_summary(customer_id: str, user: dict = Depends(get_current
             "\n\nWrite a 4-line briefing: who they are, recent service pattern, equipment risks, next-best action."
         )
         response = await chat.send_message(UserMessage(text=prompt))
-        return {"summary": str(response).strip(), "model": "claude-sonnet-4-5"}
+        return {"summary": str(response).strip(), "model": "claude-sonnet-4-5-20250929", "error_code": None}
     except Exception as e:
         logger.error(f"AI summary error: {e}")
-        return {"summary": f"Couldn't generate summary right now ({type(e).__name__}). Try again later.", "model": None}
+        return {"summary": f"Couldn't generate summary right now ({type(e).__name__}). Try again later.",
+                "model": None, "error_code": "llm_failure"}
 
 
 # -------------------- Jobs --------------------
@@ -1123,12 +1139,13 @@ async def update_job(job_id: str, body: JobUpdate, user: dict = Depends(get_curr
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Job not found")
     job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
-    if updates.get("status") == "completed" and job.get("customer_id"):
+    if updates.get("status") in ("scheduled", "in_progress", "completed", "cancelled") and job.get("customer_id"):
+        verb = {"scheduled": "scheduled", "in_progress": "started", "completed": "completed", "cancelled": "cancelled"}[updates["status"]]
         await db.communications.insert_one({
             "id": str(uuid.uuid4()), "company_id": user["company_id"],
             "customer_id": job["customer_id"], "actor_id": user["id"], "actor_name": user["name"],
             "channel": "system", "direction": "internal",
-            "summary": f"Job completed: {job['title']}", "body": "",
+            "summary": f"Job {verb}: {job['title']}", "body": "",
             "created_at": now_iso(),
         })
     return job
@@ -1328,12 +1345,18 @@ async def upload_job_photo(job_id: str, file: UploadFile = File(...), user: dict
 
 @api.delete("/jobs/{job_id}/photos/{photo_id}")
 async def delete_job_photo(job_id: str, photo_id: str, user: dict = Depends(get_current_user)):
-    result = await db.jobs.update_one(
+    job = await db.jobs.find_one(
+        {"id": job_id, "company_id": user["company_id"], "photos.id": photo_id}, {"_id": 0}
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    photo = next((p for p in (job.get("photos") or []) if p.get("id") == photo_id), None)
+    if photo and photo.get("path"):
+        delete_object(photo["path"])
+    await db.jobs.update_one(
         {"id": job_id, "company_id": user["company_id"]},
         {"$pull": {"photos": {"id": photo_id}}},
     )
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Photo not found")
     return {"ok": True}
 
 @api.post("/jobs/{job_id}/signature")
