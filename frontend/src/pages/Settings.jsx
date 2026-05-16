@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import api, { API_BASE, formatApiError } from "../lib/api";
 import Brand from "../components/Brand";
 import { toast } from "sonner";
-import { Copy, UploadSimple, Check } from "@phosphor-icons/react";
+import { Copy, UploadSimple, Check, ShieldCheck, ShieldSlash, Trash, DeviceMobile } from "@phosphor-icons/react";
 
 const COLOR_PRESETS = [
     { name: "Signal Red",   primary: "#1D4ED8", accent: "#DC2626" },
@@ -167,6 +167,9 @@ export default function Settings() {
                 </div>
             </section>
 
+            <SecuritySection />
+            <SessionsSection />
+
             <section className="border border-slate-200 p-6">
                 <div className="overline mb-3">Plan</div>
                 <div className="flex items-center justify-between">
@@ -187,5 +190,116 @@ function Field({ label, value }) {
             <div className="overline mb-1">{label}</div>
             <div className="font-medium">{value || "—"}</div>
         </div>
+    );
+}
+
+function SecuritySection() {
+    const { user, refresh } = useAuth();
+    const [setup, setSetup] = useState(null);
+    const [code, setCode] = useState("");
+    const [pw, setPw] = useState("");
+
+    const startEnroll = async () => {
+        const { data } = await api.post("/auth/mfa/setup");
+        setSetup(data);
+    };
+    const enable = async () => {
+        try {
+            await api.post("/auth/mfa/enable", { code });
+            await refresh();
+            toast.success("Two-factor enabled");
+            setSetup(null); setCode("");
+        } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+    };
+    const disable = async () => {
+        try {
+            await api.post("/auth/mfa/disable", { password: pw });
+            await refresh();
+            toast.success("Two-factor disabled");
+            setPw("");
+        } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+    };
+
+    return (
+        <section className="border border-slate-200 p-6" data-testid="security-section">
+            <div className="overline mb-3">Security · Two-factor</div>
+            {user?.mfa_enabled ? (
+                <div>
+                    <div className="flex items-center gap-2 text-sm text-emerald-700">
+                        <ShieldCheck size={18} weight="fill" /> Two-factor authentication is enabled.
+                    </div>
+                    <div className="mt-4 grid sm:grid-cols-[1fr_auto] gap-2 max-w-md">
+                        <input type="password" placeholder="Enter your password to disable" value={pw} onChange={(e) => setPw(e.target.value)}
+                            data-testid="mfa-disable-pw" className="border border-slate-300 px-3 py-2" />
+                        <button onClick={disable} disabled={!pw} data-testid="mfa-disable-button"
+                            className="px-4 py-2 border border-[#DC2626] text-[#DC2626] hover:bg-red-50 font-semibold disabled:opacity-50">
+                            <ShieldSlash size={14} className="inline mr-1" /> Disable
+                        </button>
+                    </div>
+                </div>
+            ) : setup ? (
+                <div className="grid sm:grid-cols-2 gap-6">
+                    <div className="border border-slate-200 p-3 bg-slate-50 flex items-center justify-center">
+                        <img src={setup.qr_data_url} alt="QR" className="w-44 h-44" />
+                    </div>
+                    <div className="space-y-3">
+                        <p className="text-sm text-slate-600">Scan with your authenticator and enter the 6-digit code.</p>
+                        <input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g,""))}
+                            maxLength={6} inputMode="numeric" data-testid="settings-mfa-code"
+                            className="w-full border border-slate-300 px-3 py-3 text-center font-mono text-2xl tracking-widest" />
+                        <button onClick={enable} disabled={code.length < 6} data-testid="settings-mfa-enable"
+                            className="w-full bg-[#DC2626] text-white py-2.5 font-semibold hover:bg-[#B91C1C] disabled:opacity-50">
+                            Enable
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <div>
+                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <ShieldSlash size={18} /> Not enabled.
+                    </div>
+                    <button onClick={startEnroll} data-testid="settings-mfa-start"
+                        className="mt-3 px-4 py-2 bg-[#1D4ED8] text-white font-semibold hover:bg-[#1E40AF]">
+                        Enable two-factor
+                    </button>
+                </div>
+            )}
+        </section>
+    );
+}
+
+function SessionsSection() {
+    const [sessions, setSessions] = useState([]);
+    const load = () => api.get("/sessions").then((r) => setSessions(r.data));
+    useEffect(() => { load(); }, []);
+    const revoke = async (id) => {
+        try { await api.delete(`/sessions/${id}`); toast.success("Session revoked"); load(); }
+        catch { toast.error("Could not revoke"); }
+    };
+    return (
+        <section className="border border-slate-200 p-6" data-testid="sessions-section">
+            <div className="overline mb-3">Active sessions</div>
+            <div className="divide-y divide-slate-200">
+                {sessions.map((s) => (
+                    <div key={s.id} className="py-3 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <DeviceMobile size={18} className="text-slate-400 shrink-0" />
+                            <div className="min-w-0">
+                                <div className="text-sm font-medium truncate">{s.user_agent || "Unknown device"}</div>
+                                <div className="text-xs text-slate-500">{new Date(s.created_at).toLocaleString()} · {s.ip || "—"}</div>
+                            </div>
+                        </div>
+                        {s.current ? (
+                            <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-700 font-semibold uppercase tracking-wider">This device</span>
+                        ) : (
+                            <button onClick={() => revoke(s.id)} data-testid={`revoke-session-${s.id}`}
+                                className="text-xs px-2 py-1 border border-slate-300 hover:bg-slate-50 inline-flex items-center gap-1">
+                                <Trash size={12} /> Revoke
+                            </button>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </section>
     );
 }

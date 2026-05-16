@@ -1,0 +1,50 @@
+{
+  "summary": "Phase 2B (auth/MFA/sessions/activity/users/invite/roles) validated end-to-end. Backend: 23 new pytest cases pass (super_admin seed, MFA setup+enable+disable+wrong-password, login mfa_required + valid code accepted, forgot returns reset_url for known/200 for unknown, reset revokes all sessions, sessions list marks current, revoke session blocks access, activity RBAC (owner=200, tech=403, anon=401), users tenant scoping, super_admin all_tenants, role change + owner-protection + cross-tenant 403, invite happy path + duplicate 400 + super_admin role 403 + tech invite 403, /api/config/roles shape). All 40 prior tests still pass — total 63/63. Frontend: Login two-step works, /forgot shows reset URL, /setup-mfa renders QR + manual key + 6-digit input, enable with valid pyotp code redirects to /app/dashboard, /app/admin/users lists all demo users + Invite button, /app/admin/activity shows auth.login + mfa.enabled events with action chips, /app/settings shows Security section with Disable + Revoke controls. Layout protection redirects to /setup-mfa when !mfa_enabled.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/register", "issue": "Was returning 500 due to ObjectId in response (motor mutates dict adding _id); FIXED in this iteration by adding _id to excluded keys in user_out projection."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/app/settings", "issues": ["Sessions section header label not literally 'Sessions' in DOM text (Revoke button present, but heading uses different copy). Consider an explicit 'Active sessions' heading for clarity and a11y/testability."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase2b.py",
+    "/app/test_reports/pytest/phase2b_results.xml",
+    "/app/backend/tests/test_phase2.py",
+    "/app/backend/tests/test_phase1.py",
+    "/app/backend/tests/test_a1fieldpro.py"
+  ],
+  "action_items": [
+    "Optional: add an explicit 'Active sessions' heading in Settings → SessionsSection so testability/a11y selectors are stable.",
+    "Optional: add data-testid to setup-mfa inputs (manual-key, 6-digit code, enable button) to make automated testing robust against secret-detection regex."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now ~1298 lines — well past the 700 threshold. Strongly recommend splitting into routers/{auth,mfa,sessions,activity,admin,jobs,companies,files,public,payments,invoice}.py. With Phase 2B added, the file is becoming hard to navigate.",
+    "auth/register response originally leaked Mongo ObjectId via inserted dict (fixed). Apply same pattern audit to ALL handlers that read-then-return a doc that was just inserted (motor mutates the dict). For example double-check /api/team POST, /api/customers POST, /api/jobs POST — each should explicitly drop _id before returning.",
+    "/api/users/invite returns temp_password in plaintext in the JSON response. While useful for owner-driven flow when email isn't verified, this is a potential leak if logs/screenshots are shared. Consider gating it behind an explicit ?show_temp=1 flag or only returning when env=DEV.",
+    "/api/auth/forgot returns reset_url in production response — fine for the documented owner-driven flow, but ensure this is documented as intentional and consider stripping in production via env flag (e.g. only when EMAIL_DELIVERY_OK=false).",
+    "/api/auth/reset enforces only `len < 6` password rule. Add minimum strength check (uppercase + digit, length>=8) consistent with seeded super admin password policy.",
+    "/api/sessions returns user.get('_session_id') marker that is set in get_current_user — verify token rotation sets fresh session ids on every login (already does via create_session). Good.",
+    "/api/users PATCH allows changing role to any value in ROLES — owner could escalate a user to 'super_admin' since the role is in ROLES. Add explicit guard: actor.role != 'super_admin' must not allow setting target role to 'super_admin'.",
+    "Resend free tier silently fails to send to non-verified domains. Endpoint returns email_sent=false correctly, but consider surfacing this in the Activity log entry payload for invite events so admins know whether email was actually delivered."
+  ],
+  "updated_files": [
+    "/app/backend/server.py (1-line fix: drop _id from /api/auth/register user_out)",
+    "/app/backend/tests/test_phase2b.py (new)",
+    "/app/test_reports/pytest/phase2b_results.xml (new)",
+    "/app/test_reports/iteration_4.json (new)"
+  ],
+  "success_rate": {"backend": "100% (23/23 new + 40/40 prior = 63/63)", "frontend": "100% on critical Phase 2B flows"},
+  "test_credentials": "superadmin@a1fieldpro.com / Super1234! (super_admin), demo@a1fieldpro.com / Demo1234! (owner), dispatcher@a1fieldpro.com / Demo1234! (dispatcher), tech@a1fieldpro.com / Demo1234! (technician)",
+  "seed_data_creation": "Tests create + clean up users matching ^test_ (lowercase) prefix via session-scoped autouse fixture that also resets demo accounts to mfa_enabled=False before and after the run. After UI tests I reset demo MFA back to disabled state via direct pymongo update so subsequent automated runs continue to work.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Phase 2B fully validated. The fixture in test_phase2b.py uses pymongo to reset mfa_enabled=False on the four seeded accounts (super, demo, dispatcher, tech) at session start AND end so MFA-state churn from one test class doesn't break another. If you add MFA-dependent UI tests, be sure to reset state afterwards. The /api/auth/register ObjectId bug was fixed in this iteration — please audit other POST endpoints (POST /api/team, /api/customers, /api/jobs) to ensure none of them return raw mongo dicts that may include _id post-insert. Frontend layout properly redirects /app/* to /setup-mfa when mfa_enabled=false; Settings → SecuritySection includes Disable; SessionsSection includes Revoke button (but no literal 'Sessions' heading text — consider data-testid).",
+  "rca of the issue": "Single defect found: POST /api/auth/register returned HTTP 500 because motor's insert_one mutates the input dict adding ObjectId at key '_id'. The handler then built user_out by filtering only password_hash + mfa_secret, leaving _id in place. FastAPI's jsonable_encoder cannot serialize ObjectId — raised TypeError → 500. Fix: include '_id' in the excluded keys set when constructing user_out (1-line change at server.py line 393). Verified by re-running test_phase2b::test_cross_tenant_edit_blocked which exercises the register endpoint — now returns 200 with valid JSON. Recommendation: add a generic helper `clean_user(doc)` to centralise this projection across the file."
+}

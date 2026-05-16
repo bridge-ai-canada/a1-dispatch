@@ -4,12 +4,18 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
 import os
+import io
 import uuid
 import base64
+import asyncio
 import logging
+import secrets as pysecrets
 import bcrypt
 import jwt
+import pyotp
+import qrcode
 import requests
+import resend
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Literal
 
@@ -20,6 +26,7 @@ from pydantic import BaseModel, Field, EmailStr
 from emergentintegrations.payments.stripe.checkout import (
     StripeCheckout, CheckoutSessionRequest,
 )
+from roles import ROLES, ROLE_LABELS, PERMISSIONS, INVITE_ALLOWED, has_perm
 
 # -------------------- Storage --------------------
 STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
@@ -70,7 +77,15 @@ mongo_url = os.environ["MONGO_URL"]
 db_name = os.environ["DB_NAME"]
 JWT_SECRET = os.environ["JWT_SECRET"]
 STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY", "sk_test_emergent")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "")
+SUPERADMIN_EMAIL = os.environ.get("SUPERADMIN_EMAIL", "")
+SUPERADMIN_PASSWORD = os.environ.get("SUPERADMIN_PASSWORD", "")
 JWT_ALGORITHM = "HS256"
+
+if RESEND_API_KEY:
+    resend.api_key = RESEND_API_KEY
 
 client = AsyncIOMotorClient(mongo_url)
 db = client[db_name]
@@ -91,15 +106,28 @@ def verify_password(pw: str, hashed: str) -> bool:
     except Exception:
         return False
 
-def create_access_token(user_id: str, company_id: str, role: str) -> str:
+def create_access_token(user_id: str, company_id: Optional[str], role: str, session_id: str) -> str:
     payload = {
         "sub": user_id,
         "company_id": company_id,
         "role": role,
+        "sid": session_id,
         "type": "access",
         "exp": datetime.now(timezone.utc) + timedelta(days=7),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def create_pw_reset_token(user_id: str) -> str:
+    return jwt.encode({
+        "sub": user_id, "type": "pw_reset",
+        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+    }, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def create_invite_token(user_id: str) -> str:
+    return jwt.encode({
+        "sub": user_id, "type": "invite",
+        "exp": datetime.now(timezone.utc) + timedelta(days=7),
+    }, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 def set_auth_cookie(response: Response, token: str):
     response.set_cookie(
@@ -127,9 +155,15 @@ async def get_current_user(request: Request) -> dict:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         if payload.get("type") != "access":
             raise HTTPException(status_code=401, detail="Invalid token type")
-        user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
+        user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0, "mfa_secret": 0})
+        if not user or not user.get("active", True):
+            raise HTTPException(status_code=401, detail="User not found or inactive")
+        sid = payload.get("sid")
+        if sid:
+            sess = await db.sessions.find_one({"id": sid, "revoked": {"$ne": True}}, {"_id": 0})
+            if not sess:
+                raise HTTPException(status_code=401, detail="Session revoked")
+            user["_session_id"] = sid
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
@@ -142,6 +176,84 @@ def require_role(*roles: str):
             raise HTTPException(status_code=403, detail="Forbidden")
         return user
     return checker
+
+def require_perm(perm: str):
+    async def checker(user: dict = Depends(get_current_user)):
+        if not has_perm(user.get("role", ""), perm):
+            raise HTTPException(status_code=403, detail=f"Missing permission: {perm}")
+        return user
+    return checker
+
+# -------------------- Email --------------------
+async def send_email(to: str, subject: str, html: str) -> Optional[str]:
+    if not RESEND_API_KEY:
+        logger.warning(f"Resend not configured — skipped email to {to}: {subject}")
+        return None
+    try:
+        params = {"from": SENDER_EMAIL, "to": [to], "subject": subject, "html": html}
+        res = await asyncio.to_thread(resend.Emails.send, params)
+        return res.get("id") if isinstance(res, dict) else None
+    except Exception as e:
+        logger.error(f"Email send failed: {e}")
+        return None
+
+def email_layout(title: str, body_html: str, cta_label: str = "", cta_url: str = "") -> str:
+    cta = f"""
+        <tr><td style="padding:24px 0">
+            <a href="{cta_url}" style="background:#DC2626;color:#fff;text-decoration:none;
+            padding:14px 28px;font-weight:700;font-family:Helvetica,Arial,sans-serif;
+            display:inline-block;letter-spacing:0.02em">{cta_label}</a>
+        </td></tr>
+    """ if cta_label else ""
+    return f"""
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc;padding:32px 0;font-family:Helvetica,Arial,sans-serif;color:#0f172a">
+      <tr><td align="center">
+        <table cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff;border:1px solid #e2e8f0">
+          <tr><td style="background:#1D4ED8;color:#fff;padding:20px 24px;font-size:22px;font-weight:800;letter-spacing:-0.02em">
+            A1 Field Pro
+          </td></tr>
+          <tr><td style="padding:32px 24px">
+            <h1 style="margin:0 0 12px;font-size:24px;font-weight:800;letter-spacing:-0.02em">{title}</h1>
+            <div style="font-size:15px;line-height:1.6;color:#334155">{body_html}</div>
+            {cta}
+            <p style="margin-top:24px;font-size:12px;color:#94a3b8">If you didn't expect this email, you can ignore it.</p>
+          </td></tr>
+          <tr><td style="background:#f1f5f9;padding:14px 24px;font-size:11px;color:#64748b;letter-spacing:0.1em;text-transform:uppercase">
+            A1 HVAC N DE-GO · A1 Field Pro
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+    """
+
+# -------------------- Activity & Sessions --------------------
+async def log_activity(actor: dict, action: str, target_type: str = "", target_id: str = "", meta: Optional[dict] = None):
+    await db.activity.insert_one({
+        "id": str(uuid.uuid4()),
+        "company_id": actor.get("company_id"),
+        "actor_id": actor.get("id"),
+        "actor_name": actor.get("name"),
+        "actor_role": actor.get("role"),
+        "action": action,
+        "target_type": target_type,
+        "target_id": target_id,
+        "meta": meta or {},
+        "created_at": now_iso(),
+    })
+
+async def create_session(user: dict, request: Request) -> str:
+    sid = str(uuid.uuid4())
+    await db.sessions.insert_one({
+        "id": sid,
+        "user_id": user["id"],
+        "company_id": user.get("company_id"),
+        "user_agent": request.headers.get("User-Agent", ""),
+        "ip": request.client.host if request.client else "",
+        "created_at": now_iso(),
+        "last_seen_at": now_iso(),
+        "revoked": False,
+    })
+    return sid
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -156,6 +268,30 @@ class RegisterIn(BaseModel):
 
 class LoginIn(BaseModel):
     email: EmailStr
+    password: str
+    mfa_code: Optional[str] = None
+
+class ForgotIn(BaseModel):
+    email: EmailStr
+
+class ResetIn(BaseModel):
+    token: str
+    new_password: str
+
+class InviteIn(BaseModel):
+    name: str
+    email: EmailStr
+    role: str
+
+class UserUpdateIn(BaseModel):
+    role: Optional[str] = None
+    active: Optional[bool] = None
+    name: Optional[str] = None
+
+class MfaEnableIn(BaseModel):
+    code: str
+
+class MfaDisableIn(BaseModel):
     password: str
 
 class UserOut(BaseModel):
@@ -222,7 +358,7 @@ class CheckoutIn(BaseModel):
 
 # -------------------- Auth Routes --------------------
 @api.post("/auth/register")
-async def register(body: RegisterIn, response: Response):
+async def register(body: RegisterIn, request: Request, response: Response):
     email = body.email.lower().strip()
     existing = await db.users.find_one({"email": email})
     if existing:
@@ -237,41 +373,251 @@ async def register(body: RegisterIn, response: Response):
         "owner_id": user_id,
         "created_at": now,
     })
-    await db.users.insert_one({
+    user_doc = {
         "id": user_id,
         "company_id": company_id,
         "name": body.name,
         "email": email,
         "password_hash": hash_password(body.password),
         "role": "owner",
+        "active": True,
+        "mfa_enabled": False,
+        "mfa_secret": None,
+        "email_verified": False,
         "created_at": now,
-    })
-    token = create_access_token(user_id, company_id, "owner")
+    }
+    await db.users.insert_one(user_doc)
+    sid = await create_session(user_doc, request)
+    token = create_access_token(user_id, company_id, "owner", sid)
     set_auth_cookie(response, token)
-    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
-    return {"user": user, "token": token}
+    user_out = {k: v for k, v in user_doc.items() if k not in {"password_hash", "mfa_secret", "_id"}}
+    await log_activity(user_out, "company.created", "company", company_id)
+    return {"user": user_out, "token": token}
 
 @api.post("/auth/login")
-async def login(body: LoginIn, response: Response):
+async def login(body: LoginIn, request: Request, response: Response):
     email = body.email.lower().strip()
     user = await db.users.find_one({"email": email})
     if not user or not verify_password(body.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    token = create_access_token(user["id"], user["company_id"], user["role"])
+    if not user.get("active", True):
+        raise HTTPException(status_code=403, detail="Account deactivated")
+    if user.get("mfa_enabled"):
+        code = (body.mfa_code or "").strip()
+        if not code:
+            raise HTTPException(status_code=401, detail="mfa_required")
+        if not pyotp.TOTP(user["mfa_secret"]).verify(code, valid_window=1):
+            raise HTTPException(status_code=401, detail="Invalid MFA code")
+    sid = await create_session(user, request)
+    token = create_access_token(user["id"], user.get("company_id"), user["role"], sid)
     set_auth_cookie(response, token)
-    user.pop("password_hash", None)
-    user.pop("_id", None)
+    user.pop("password_hash", None); user.pop("mfa_secret", None); user.pop("_id", None)
+    await log_activity(user, "auth.login")
     return {"user": user, "token": token}
 
 @api.post("/auth/logout")
-async def logout(response: Response):
+async def logout(request: Request, response: Response):
+    token = request.cookies.get("access_token")
+    if token:
+        try:
+            p = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            sid = p.get("sid")
+            if sid:
+                await db.sessions.update_one({"id": sid}, {"$set": {"revoked": True, "revoked_at": now_iso()}})
+        except Exception:
+            pass
     clear_auth_cookie(response)
     return {"ok": True}
 
 @api.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
-    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
-    return {"user": user, "company": company}
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0}) if user.get("company_id") else None
+    return {"user": user, "company": company, "permissions": PERMISSIONS.get(user["role"], [])}
+
+# -------------------- Password reset --------------------
+@api.post("/auth/forgot")
+async def forgot(body: ForgotIn):
+    email = body.email.lower().strip()
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    if user:
+        token = create_pw_reset_token(user["id"])
+        reset_url = f"{FRONTEND_URL}/reset?token={token}"
+        await send_email(
+            email,
+            "Reset your A1 Field Pro password",
+            email_layout(
+                "Reset your password",
+                f"<p>Hi {user.get('name','there')}, we received a request to reset your password. This link expires in 1 hour.</p>",
+                "Reset password", reset_url,
+            ),
+        )
+        return {"ok": True, "reset_url": reset_url}  # url shown in response for owner-driven flow
+    return {"ok": True}  # do not reveal
+
+@api.post("/auth/reset")
+async def reset(body: ResetIn):
+    try:
+        payload = jwt.decode(body.token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "pw_reset":
+            raise HTTPException(status_code=400, detail="Invalid token")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=400, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=400, detail="Invalid token")
+    if len(body.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password too short")
+    result = await db.users.update_one(
+        {"id": payload["sub"]}, {"$set": {"password_hash": hash_password(body.new_password)}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=400, detail="User not found")
+    # invalidate all sessions
+    await db.sessions.update_many({"user_id": payload["sub"]}, {"$set": {"revoked": True}})
+    return {"ok": True}
+
+# -------------------- MFA --------------------
+def _qr_data_url(otpauth_url: str) -> str:
+    img = qrcode.make(otpauth_url)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+@api.post("/auth/mfa/setup")
+async def mfa_setup(user: dict = Depends(get_current_user)):
+    secret = pyotp.random_base32()
+    otpauth = pyotp.totp.TOTP(secret).provisioning_uri(name=user["email"], issuer_name="A1 Field Pro")
+    await db.users.update_one(
+        {"id": user["id"]}, {"$set": {"mfa_secret": secret, "mfa_enabled": False}}
+    )
+    return {"secret": secret, "otpauth_url": otpauth, "qr_data_url": _qr_data_url(otpauth)}
+
+@api.post("/auth/mfa/enable")
+async def mfa_enable(body: MfaEnableIn, user: dict = Depends(get_current_user)):
+    u = await db.users.find_one({"id": user["id"]})
+    if not u or not u.get("mfa_secret"):
+        raise HTTPException(status_code=400, detail="MFA setup not started")
+    if not pyotp.TOTP(u["mfa_secret"]).verify(body.code.strip(), valid_window=1):
+        raise HTTPException(status_code=400, detail="Invalid code")
+    await db.users.update_one({"id": user["id"]}, {"$set": {"mfa_enabled": True}})
+    await log_activity(user, "mfa.enabled")
+    return {"ok": True}
+
+@api.post("/auth/mfa/disable")
+async def mfa_disable(body: MfaDisableIn, user: dict = Depends(get_current_user)):
+    u = await db.users.find_one({"id": user["id"]})
+    if not verify_password(body.password, u["password_hash"]):
+        raise HTTPException(status_code=401, detail="Wrong password")
+    await db.users.update_one(
+        {"id": user["id"]}, {"$set": {"mfa_enabled": False, "mfa_secret": None}}
+    )
+    await log_activity(user, "mfa.disabled")
+    return {"ok": True}
+
+# -------------------- Sessions --------------------
+@api.get("/sessions")
+async def list_sessions(user: dict = Depends(get_current_user)):
+    items = await db.sessions.find(
+        {"user_id": user["id"], "revoked": {"$ne": True}}, {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    for s in items:
+        s["current"] = s["id"] == user.get("_session_id")
+    return items
+
+@api.delete("/sessions/{session_id}")
+async def revoke_session(session_id: str, user: dict = Depends(get_current_user)):
+    await db.sessions.update_one(
+        {"id": session_id, "user_id": user["id"]},
+        {"$set": {"revoked": True, "revoked_at": now_iso()}},
+    )
+    return {"ok": True}
+
+# -------------------- Activity --------------------
+@api.get("/activity")
+async def activity_feed(
+    user: dict = Depends(require_perm("activity.read")),
+    limit: int = 50, skip: int = 0, action: Optional[str] = None,
+):
+    q = {}
+    if user["role"] != "super_admin":
+        q["company_id"] = user["company_id"]
+    if action:
+        q["action"] = action
+    items = await db.activity.find(q, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    return items
+
+# -------------------- Admin: Users --------------------
+@api.get("/users")
+async def list_users(user: dict = Depends(get_current_user), all_tenants: bool = False):
+    if user["role"] == "super_admin" and all_tenants:
+        q = {}
+    else:
+        q = {"company_id": user["company_id"]}
+    items = await db.users.find(q, {"_id": 0, "password_hash": 0, "mfa_secret": 0}).to_list(500)
+    return items
+
+@api.patch("/users/{user_id}")
+async def update_user(user_id: str, body: UserUpdateIn, actor: dict = Depends(get_current_user)):
+    if actor["role"] not in ("super_admin", "owner"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    target = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0, "mfa_secret": 0})
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    if actor["role"] != "super_admin" and target.get("company_id") != actor["company_id"]:
+        raise HTTPException(status_code=403, detail="Cross-tenant edit forbidden")
+    if target.get("role") == "owner" and actor["id"] != target["id"]:
+        raise HTTPException(status_code=400, detail="Cannot modify the company owner")
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    if "role" in updates and updates["role"] not in ROLES:
+        raise HTTPException(status_code=400, detail="Invalid role")
+    if updates:
+        await db.users.update_one({"id": user_id}, {"$set": updates})
+        await log_activity(actor, "user.updated", "user", user_id, updates)
+    return await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0, "mfa_secret": 0})
+
+@api.post("/users/invite")
+async def invite_user(body: InviteIn, actor: dict = Depends(get_current_user)):
+    allowed = INVITE_ALLOWED.get(actor["role"], set())
+    if body.role not in allowed:
+        raise HTTPException(status_code=403, detail=f"Cannot invite role '{body.role}'")
+    email = body.email.lower().strip()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="Email already registered")
+    temp_password = pysecrets.token_urlsafe(10)
+    uid = str(uuid.uuid4())
+    user = {
+        "id": uid,
+        "company_id": actor["company_id"],
+        "name": body.name,
+        "email": email,
+        "password_hash": hash_password(temp_password),
+        "role": body.role,
+        "active": True,
+        "mfa_enabled": False,
+        "mfa_secret": None,
+        "email_verified": False,
+        "invited_by": actor["id"],
+        "created_at": now_iso(),
+    }
+    await db.users.insert_one(user)
+    user.pop("_id", None)
+    token = create_invite_token(uid)
+    setup_url = f"{FRONTEND_URL}/reset?token={create_pw_reset_token(uid)}&invited=1"
+    company = await db.companies.find_one({"id": actor["company_id"]}, {"_id": 0}) or {}
+    email_id = await send_email(
+        email,
+        f"You're invited to {company.get('name','A1 Field Pro')}",
+        email_layout(
+            f"You're invited to {company.get('name','A1 Field Pro')}",
+            f"<p>{actor['name']} invited you as a <strong>{ROLE_LABELS.get(body.role, body.role)}</strong>. Click the button to set your password and sign in.</p>",
+            "Set my password", setup_url,
+        ),
+    )
+    await log_activity(actor, "user.invited", "user", uid, {"role": body.role, "email": email})
+    out = {k: v for k, v in user.items() if k not in {"password_hash", "mfa_secret"}}
+    out["setup_url"] = setup_url
+    out["temp_password"] = temp_password
+    out["email_sent"] = bool(email_id)
+    return out
 
 # -------------------- Company / Team --------------------
 @api.get("/companies/me")
@@ -815,6 +1161,11 @@ async def invoice_pdf(job_id: str, user: dict = Depends(get_current_user)):
     return Response(content=pdf, media_type="application/pdf",
                     headers={"Content-Disposition": f'inline; filename="invoice-{job["id"][:8]}.pdf"'})
 
+@api.get("/config/roles")
+async def get_roles_config(user: dict = Depends(get_current_user)):
+    return {"roles": ROLES, "labels": ROLE_LABELS, "permissions": PERMISSIONS,
+            "invite_allowed": {k: list(v) for k, v in INVITE_ALLOWED.items()}}
+
 # -------------------- Health --------------------
 @api.get("/")
 async def root():
@@ -833,12 +1184,34 @@ async def startup():
     await seed_demo()
 
 async def seed_demo():
-    """Seed a demo company + owner + technician + sample data for quick tour."""
+    """Seed super_admin + demo company + sample data."""
+    # Super admin (platform-level, no company_id)
+    if SUPERADMIN_EMAIL and SUPERADMIN_PASSWORD:
+        sa = await db.users.find_one({"email": SUPERADMIN_EMAIL.lower()})
+        if not sa:
+            await db.users.insert_one({
+                "id": str(uuid.uuid4()),
+                "company_id": None,
+                "name": "Platform Super Admin",
+                "email": SUPERADMIN_EMAIL.lower(),
+                "password_hash": hash_password(SUPERADMIN_PASSWORD),
+                "role": "super_admin",
+                "active": True,
+                "mfa_enabled": False,
+                "mfa_secret": None,
+                "email_verified": True,
+                "created_at": now_iso(),
+            })
+        elif not verify_password(SUPERADMIN_PASSWORD, sa["password_hash"]):
+            await db.users.update_one(
+                {"email": SUPERADMIN_EMAIL.lower()},
+                {"$set": {"password_hash": hash_password(SUPERADMIN_PASSWORD)}},
+            )
+
     demo_email = os.environ.get("ADMIN_EMAIL", "demo@a1fieldpro.com")
     demo_password = os.environ.get("ADMIN_PASSWORD", "Demo1234!")
     existing = await db.users.find_one({"email": demo_email})
     if existing:
-        # Update password to match env (idempotent)
         if not verify_password(demo_password, existing["password_hash"]):
             await db.users.update_one(
                 {"email": demo_email}, {"$set": {"password_hash": hash_password(demo_password)}}
@@ -857,13 +1230,16 @@ async def seed_demo():
     await db.users.insert_many([
         {"id": owner_id, "company_id": company_id, "name": "Demo Owner",
          "email": demo_email, "password_hash": hash_password(demo_password),
-         "role": "owner", "created_at": now},
+         "role": "owner", "active": True, "mfa_enabled": False, "mfa_secret": None,
+         "email_verified": True, "created_at": now},
         {"id": disp_id, "company_id": company_id, "name": "Dana Dispatcher",
          "email": "dispatcher@a1fieldpro.com", "password_hash": hash_password("Demo1234!"),
-         "role": "dispatcher", "created_at": now},
+         "role": "dispatcher", "active": True, "mfa_enabled": False, "mfa_secret": None,
+         "email_verified": True, "created_at": now},
         {"id": tech_id, "company_id": company_id, "name": "Tom Technician",
          "email": "tech@a1fieldpro.com", "password_hash": hash_password("Demo1234!"),
-         "role": "technician", "created_at": now},
+         "role": "technician", "active": True, "mfa_enabled": False, "mfa_secret": None,
+         "email_verified": True, "created_at": now},
     ])
     today = datetime.now(timezone.utc).replace(hour=14, minute=0, second=0, microsecond=0)
     sample_jobs = [

@@ -1,20 +1,23 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Brand from "./Brand";
 import {
     SquaresFour, Wrench, CalendarBlank, UsersThree,
     AddressBook, GearSix, SignOut, List, X, DeviceMobile,
+    ShieldCheck, ClockCounterClockwise, Buildings,
 } from "@phosphor-icons/react";
 import { useState } from "react";
 
 const baseNav = [
-    { to: "/app/dashboard", label: "Dashboard", icon: SquaresFour, roles: ["owner","dispatcher","technician"] },
-    { to: "/app/jobs", label: "Work Orders", icon: Wrench, roles: ["owner","dispatcher"] },
-    { to: "/app/schedule", label: "Schedule", icon: CalendarBlank, roles: ["owner","dispatcher"] },
-    { to: "/app/team", label: "Team", icon: UsersThree, roles: ["owner","dispatcher"] },
-    { to: "/app/customers", label: "Customers", icon: AddressBook, roles: ["owner","dispatcher"] },
+    { to: "/app/dashboard", label: "Dashboard", icon: SquaresFour, roles: ["owner","dispatcher","office_manager","csr","sales_rep","accountant","technician"] },
+    { to: "/app/jobs", label: "Work Orders", icon: Wrench, roles: ["owner","dispatcher","office_manager","csr","sales_rep","accountant"] },
+    { to: "/app/schedule", label: "Schedule", icon: CalendarBlank, roles: ["owner","dispatcher","office_manager"] },
+    { to: "/app/team", label: "Team", icon: UsersThree, roles: ["owner","dispatcher","office_manager"] },
+    { to: "/app/customers", label: "Customers", icon: AddressBook, roles: ["owner","dispatcher","office_manager","csr","sales_rep"] },
     { to: "/app/my-jobs", label: "My Jobs", icon: DeviceMobile, roles: ["owner","dispatcher","technician"] },
-    { to: "/app/settings", label: "Settings", icon: GearSix, roles: ["owner"] },
+    { to: "/app/admin/users", label: "Users", icon: ShieldCheck, roles: ["owner","super_admin"] },
+    { to: "/app/admin/activity", label: "Activity", icon: ClockCounterClockwise, roles: ["owner","office_manager","accountant","super_admin"] },
+    { to: "/app/settings", label: "Settings", icon: GearSix, roles: ["owner","super_admin"] },
 ];
 
 export default function Layout() {
@@ -116,6 +119,7 @@ export default function Layout() {
 
 export function Protected({ children, roles }) {
     const { user, loading } = useAuth();
+    const location = useLocation();
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
@@ -126,6 +130,10 @@ export function Protected({ children, roles }) {
     if (!user) {
         window.location.href = "/login";
         return null;
+    }
+    // MFA required for everyone (except super_admin can self-enable later)
+    if (!user.mfa_enabled && location.pathname !== "/setup-mfa") {
+        return <Navigate to="/setup-mfa" replace />;
     }
     if (roles && !roles.includes(user.role)) {
         return (

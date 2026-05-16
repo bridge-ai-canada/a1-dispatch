@@ -16,6 +16,11 @@ import Settings from "./pages/Settings";
 import PaymentResult from "./pages/PaymentResult";
 import JobDetail from "./pages/JobDetail";
 import BookingWidget from "./pages/BookingWidget";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import SetupMFA from "./pages/SetupMFA";
+import AdminUsers from "./pages/AdminUsers";
+import Activity from "./pages/Activity";
 
 function HomeRouter() {
     const { user, loading } = useAuth();
@@ -33,6 +38,9 @@ function App() {
                     <Route path="/" element={<HomeRouter />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
+                    <Route path="/forgot" element={<ForgotPassword />} />
+                    <Route path="/reset" element={<ResetPassword />} />
+                    <Route path="/setup-mfa" element={<SetupMFA />} />
                     <Route path="/payment/result" element={<PaymentResult />} />
                     <Route path="/book/:companyId" element={<BookingWidget />} />
 
@@ -53,6 +61,8 @@ function App() {
                         <Route path="customers" element={<Customers />} />
                         <Route path="my-jobs" element={<MyJobs />} />
                         <Route path="settings" element={<Settings />} />
+                        <Route path="admin/users" element={<AdminUsers />} />
+                        <Route path="admin/activity" element={<Activity />} />
                     </Route>
 
                     <Route path="*" element={<Navigate to="/" replace />} />
