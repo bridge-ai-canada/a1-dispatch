@@ -50,17 +50,24 @@ capable, cleaner than Workiz, simpler than ServiceTitan.
 
 Testing: backend 30/30 pytest pass (18 baseline + 12 phase 1); frontend critical flows verified.
 
+## What's been implemented (Phase 2A — Feb 2026 — v1.2)
+- **White-label branding**: owner-only `PATCH /api/companies/me` for primary + accent color; `POST /api/companies/me/logo` (multipart) stores logo via object storage and writes `company.branding.logo_path`. Settings UI: logo uploader, 5 color presets, primary/accent color pickers, Save button.
+- **PDF Invoice**: `GET /api/jobs/{id}/invoice.pdf` generates a branded invoice (header bar in company primary color, total in accent, PAID stamp when paid) via reportlab. "Invoice PDF" button on JobDetail opens it in a new tab using same-origin httpOnly cookie auth.
+- **Booking widget polish**: shadcn Calendar inside Popover replaces the native datetime picker for the "Preferred date" field; Settings page now exposes a copy-paste `<iframe>` embed snippet alongside the direct link.
+
+Testing: backend 40/40 pytest pass (30 prior + 10 new); frontend critical flows verified.
+
 ## Backlog (prioritized)
-### P0 — Phase 2 (next)
-- PDF invoice generation + email send (Resend or SendGrid — needs API key)
-- White-label settings: logo + primary color upload (UI exists, needs wiring)
+### P0 — Phase 2B (next)
 - Emergent-managed Google login
-- MFA via TOTP
+- TOTP MFA enrollment + verification
+- Email invoice send (waiting on Resend or SendGrid API key from user)
 
 ### P1 — Soon
-- Apple login (needs Apple Developer account)
-- Customer-facing booking widget polish (shadcn calendar, embeddable iframe snippet)
-- Job-photo lightbox + lazy loading
+- Apple login (needs Apple Developer account from user)
+- Logo display on landing/booking widget (currently saved but not yet rendered)
+- Hex color validation (regex) before persisting
+- Split `server.py` into routers (`auth`, `jobs`, `companies`, `files`, `public`, `payments`, `invoice`) — file is now ~920 lines
 
 ### P2 — Future
 - Route optimization

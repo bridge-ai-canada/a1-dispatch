@@ -3,7 +3,9 @@ import { useParams, Link } from "react-router-dom";
 import { useEffect } from "react";
 import axios from "axios";
 import { toast, Toaster } from "sonner";
-import { Wrench, CheckCircle, ArrowRight } from "@phosphor-icons/react";
+import { Wrench, CheckCircle, ArrowRight, CalendarBlank as CalIcon } from "@phosphor-icons/react";
+import { Calendar } from "../components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -86,9 +88,27 @@ export default function BookingWidget() {
                                 </select>
                             </div>
                             <div>
-                                <label className="text-xs font-medium">Preferred date/time</label>
-                                <input type="datetime-local" value={form.preferred_date} onChange={update("preferred_date")} data-testid="booking-date"
-                                    className="mt-1 w-full border border-slate-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]" />
+                                <label className="text-xs font-medium">Preferred date</label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <button type="button" data-testid="booking-date-trigger"
+                                            className="mt-1 w-full border border-slate-300 px-3 py-2.5 text-left text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8] bg-white flex items-center gap-2">
+                                            <CalIcon size={14} className="text-slate-400" />
+                                            {form.preferred_date
+                                                ? new Date(form.preferred_date).toLocaleDateString([], { dateStyle: "medium" })
+                                                : <span className="text-slate-400">Pick a date</span>}
+                                        </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={form.preferred_date ? new Date(form.preferred_date) : undefined}
+                                            onSelect={(d) => setForm((f) => ({ ...f, preferred_date: d ? d.toISOString() : "" }))}
+                                            disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
                             </div>
                         </div>
                         <div>
