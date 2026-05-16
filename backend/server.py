@@ -325,6 +325,44 @@ class CustomerIn(BaseModel):
     phone: Optional[str] = ""
     email: Optional[str] = ""
     address: Optional[str] = ""
+    status: Optional[Literal["lead","prospect","active","churned"]] = "active"
+    tags: Optional[List[str]] = None
+    source: Optional[str] = ""
+    notes: Optional[str] = ""
+
+class CustomerUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    status: Optional[Literal["lead","prospect","active","churned"]] = None
+    tags: Optional[List[str]] = None
+    source: Optional[str] = None
+    notes: Optional[str] = None
+
+class PropertyIn(BaseModel):
+    address: str
+    nickname: Optional[str] = ""
+    property_type: Optional[str] = "residential"
+    sq_ft: Optional[int] = 0
+    year_built: Optional[int] = 0
+    notes: Optional[str] = ""
+
+class EquipmentIn(BaseModel):
+    property_id: str
+    kind: str  # "AC","Furnace","Water Heater","Garage Door","Panel"...
+    brand: Optional[str] = ""
+    model: Optional[str] = ""
+    serial: Optional[str] = ""
+    install_date: Optional[str] = ""
+    warranty_until: Optional[str] = ""
+    notes: Optional[str] = ""
+
+class CommunicationIn(BaseModel):
+    channel: Literal["call","email","sms","note","system"] = "note"
+    direction: Optional[Literal["in","out","internal"]] = "internal"
+    summary: str
+    body: Optional[str] = ""
 
 class BrandingIn(BaseModel):
     primary_color: Optional[str] = None
@@ -780,10 +818,22 @@ async def remove_team_member(user_id: str, user: dict = Depends(require_role("ow
 
 # -------------------- Customers --------------------
 @api.get("/customers")
-async def list_customers(user: dict = Depends(get_current_user)):
+async def list_customers(
+    user: dict = Depends(get_current_user),
+    q: Optional[str] = None, status: Optional[str] = None, tag: Optional[str] = None,
+    limit: int = 200, skip: int = 0,
+):
+    query = {"company_id": user["company_id"]}
+    if status:
+        query["status"] = status
+    if tag:
+        query["tags"] = tag
+    if q:
+        rx = {"$regex": q, "$options": "i"}
+        query["$or"] = [{"name": rx}, {"phone": rx}, {"email": rx}, {"address": rx}]
     items = await db.customers.find(
-        {"company_id": user["company_id"]}, {"_id": 0}
-    ).sort("created_at", -1).to_list(500)
+        query, {"_id": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     return items
 
 @api.post("/customers")
@@ -792,11 +842,218 @@ async def create_customer(body: CustomerIn, user: dict = Depends(get_current_use
         "id": str(uuid.uuid4()),
         "company_id": user["company_id"],
         "created_at": now_iso(),
-        **body.model_dump(),
+        "created_by": user["id"],
+        "tags": body.tags or [],
+        **body.model_dump(exclude={"tags"}),
     }
     await db.customers.insert_one(doc)
     doc.pop("_id", None)
+    await log_activity(user, "customer.created", "customer", doc["id"], {"name": body.name})
     return doc
+
+@api.get("/customers/{customer_id}")
+async def get_customer(customer_id: str, user: dict = Depends(get_current_user)):
+    cust = await db.customers.find_one({"id": customer_id, "company_id": user["company_id"]}, {"_id": 0})
+    if not cust:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return cust
+
+@api.patch("/customers/{customer_id}")
+async def update_customer(customer_id: str, body: CustomerUpdate, user: dict = Depends(get_current_user)):
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields")
+    updates["updated_at"] = now_iso()
+    result = await db.customers.update_one(
+        {"id": customer_id, "company_id": user["company_id"]}, {"$set": updates}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return await db.customers.find_one({"id": customer_id}, {"_id": 0})
+
+# -------- Properties ----------
+@api.get("/customers/{customer_id}/properties")
+async def list_properties(customer_id: str, user: dict = Depends(get_current_user)):
+    items = await db.properties.find(
+        {"customer_id": customer_id, "company_id": user["company_id"]}, {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    return items
+
+@api.post("/customers/{customer_id}/properties")
+async def create_property(customer_id: str, body: PropertyIn, user: dict = Depends(get_current_user)):
+    cust = await db.customers.find_one({"id": customer_id, "company_id": user["company_id"]}, {"_id": 0})
+    if not cust:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "company_id": user["company_id"],
+        "customer_id": customer_id,
+        "created_at": now_iso(),
+        **body.model_dump(),
+    }
+    await db.properties.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api.delete("/properties/{property_id}")
+async def delete_property(property_id: str, user: dict = Depends(get_current_user)):
+    await db.equipment.delete_many({"property_id": property_id, "company_id": user["company_id"]})
+    res = await db.properties.delete_one({"id": property_id, "company_id": user["company_id"]})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True}
+
+# -------- Equipment ----------
+@api.get("/customers/{customer_id}/equipment")
+async def list_equipment(customer_id: str, user: dict = Depends(get_current_user)):
+    items = await db.equipment.find(
+        {"customer_id": customer_id, "company_id": user["company_id"]}, {"_id": 0}
+    ).sort("created_at", -1).to_list(200)
+    return items
+
+@api.post("/customers/{customer_id}/equipment")
+async def create_equipment(customer_id: str, body: EquipmentIn, user: dict = Depends(get_current_user)):
+    prop = await db.properties.find_one(
+        {"id": body.property_id, "customer_id": customer_id, "company_id": user["company_id"]}, {"_id": 0}
+    )
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "company_id": user["company_id"],
+        "customer_id": customer_id,
+        "created_at": now_iso(),
+        **body.model_dump(),
+    }
+    await db.equipment.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api.delete("/equipment/{equipment_id}")
+async def delete_equipment(equipment_id: str, user: dict = Depends(get_current_user)):
+    res = await db.equipment.delete_one({"id": equipment_id, "company_id": user["company_id"]})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True}
+
+# -------- Communications ----------
+@api.get("/customers/{customer_id}/communications")
+async def list_communications(customer_id: str, user: dict = Depends(get_current_user)):
+    items = await db.communications.find(
+        {"customer_id": customer_id, "company_id": user["company_id"]}, {"_id": 0}
+    ).sort("created_at", -1).to_list(500)
+    return items
+
+@api.post("/customers/{customer_id}/communications")
+async def create_communication(customer_id: str, body: CommunicationIn, user: dict = Depends(get_current_user)):
+    doc = {
+        "id": str(uuid.uuid4()),
+        "company_id": user["company_id"],
+        "customer_id": customer_id,
+        "actor_id": user["id"],
+        "actor_name": user["name"],
+        "created_at": now_iso(),
+        **body.model_dump(),
+    }
+    await db.communications.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+# -------- Files ----------
+@api.post("/customers/{customer_id}/files")
+async def upload_customer_file(customer_id: str, file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    cust = await db.customers.find_one({"id": customer_id, "company_id": user["company_id"]}, {"_id": 0})
+    if not cust:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    ext = (file.filename or "f").rsplit(".",1)[-1].lower() if "." in (file.filename or "") else "bin"
+    path = f"{APP_NAME}/{user['company_id']}/customers/{customer_id}/{uuid.uuid4()}.{ext}"
+    data = await file.read()
+    result = put_object(path, data, file.content_type or "application/octet-stream")
+    rec = {
+        "id": str(uuid.uuid4()),
+        "company_id": user["company_id"],
+        "customer_id": customer_id,
+        "filename": file.filename or "file",
+        "path": result["path"],
+        "content_type": file.content_type,
+        "size": result.get("size", len(data)),
+        "uploaded_by": user["id"],
+        "uploaded_at": now_iso(),
+    }
+    await db.customer_files.insert_one(rec)
+    rec.pop("_id", None)
+    return rec
+
+@api.get("/customers/{customer_id}/files")
+async def list_customer_files(customer_id: str, user: dict = Depends(get_current_user)):
+    items = await db.customer_files.find(
+        {"customer_id": customer_id, "company_id": user["company_id"]}, {"_id": 0}
+    ).sort("uploaded_at", -1).to_list(200)
+    return items
+
+@api.delete("/customers/{customer_id}/files/{file_id}")
+async def delete_customer_file(customer_id: str, file_id: str, user: dict = Depends(get_current_user)):
+    res = await db.customer_files.delete_one(
+        {"id": file_id, "customer_id": customer_id, "company_id": user["company_id"]}
+    )
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True}
+
+# -------- Timeline ----------
+@api.get("/customers/{customer_id}/timeline")
+async def customer_timeline(customer_id: str, user: dict = Depends(get_current_user), limit: int = 100):
+    cust = await db.customers.find_one({"id": customer_id, "company_id": user["company_id"]}, {"_id": 0})
+    if not cust:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    jobs = await db.jobs.find({"customer_id": customer_id, "company_id": user["company_id"]}, {"_id": 0}).to_list(200)
+    comms = await db.communications.find({"customer_id": customer_id, "company_id": user["company_id"]}, {"_id": 0}).to_list(200)
+    files = await db.customer_files.find({"customer_id": customer_id, "company_id": user["company_id"]}, {"_id": 0}).to_list(200)
+    events = []
+    for j in jobs:
+        events.append({"kind": "job", "ts": j.get("created_at"), "title": j["title"], "ref": j["id"], "status": j.get("status"), "price": j.get("price")})
+    for c in comms:
+        events.append({"kind": "comm", "ts": c["created_at"], "channel": c.get("channel"), "summary": c["summary"], "actor": c.get("actor_name"), "ref": c["id"]})
+    for f in files:
+        events.append({"kind": "file", "ts": f["uploaded_at"], "title": f["filename"], "ref": f["id"]})
+    events.sort(key=lambda e: e.get("ts") or "", reverse=True)
+    return events[:limit]
+
+# -------- AI summary ----------
+@api.get("/customers/{customer_id}/summary")
+async def customer_ai_summary(customer_id: str, user: dict = Depends(get_current_user)):
+    cust = await db.customers.find_one({"id": customer_id, "company_id": user["company_id"]}, {"_id": 0})
+    if not cust:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    jobs = await db.jobs.find({"customer_id": customer_id, "company_id": user["company_id"]}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    equip = await db.equipment.find({"customer_id": customer_id, "company_id": user["company_id"]}, {"_id": 0}).to_list(50)
+    if not EMERGENT_KEY:
+        return {"summary": "AI summary unavailable (no LLM key configured).", "model": None}
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=EMERGENT_KEY,
+            session_id=f"cust-summary-{customer_id}",
+            system_message=(
+                "You are a senior dispatcher writing a 4-line briefing for a field service company. "
+                "Be specific, terse, and actionable. Use plain text — no markdown, no bullets."
+            ),
+        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+        job_lines = [f"- {j.get('created_at','')[:10]} {j.get('job_type','')} \"{j.get('title','')}\" status={j.get('status','')} ${j.get('price',0):.0f}" for j in jobs[:8]]
+        equip_lines = [f"- {e.get('kind','')} {e.get('brand','')} {e.get('model','')} (installed {e.get('install_date') or '?'})" for e in equip[:8]]
+        prompt = (
+            f"Customer: {cust.get('name')} ({cust.get('status','active')}). Tags: {', '.join(cust.get('tags',[]))}. "
+            f"Phone {cust.get('phone','')}. Address {cust.get('address','')}.\n\n"
+            f"Recent jobs ({len(jobs)} total):\n" + ("\n".join(job_lines) or "- none") +
+            f"\n\nEquipment ({len(equip)}):\n" + ("\n".join(equip_lines) or "- none") +
+            "\n\nWrite a 4-line briefing: who they are, recent service pattern, equipment risks, next-best action."
+        )
+        response = await chat.send_message(UserMessage(text=prompt))
+        return {"summary": str(response).strip(), "model": "claude-sonnet-4-5"}
+    except Exception as e:
+        logger.error(f"AI summary error: {e}")
+        return {"summary": f"Couldn't generate summary right now ({type(e).__name__}). Try again later.", "model": None}
+
 
 # -------------------- Jobs --------------------
 @api.get("/jobs")
@@ -831,6 +1088,14 @@ async def create_job(body: JobIn, user: dict = Depends(get_current_user)):
     }
     await db.jobs.insert_one(doc)
     doc.pop("_id", None)
+    if doc.get("customer_id"):
+        await db.communications.insert_one({
+            "id": str(uuid.uuid4()), "company_id": user["company_id"],
+            "customer_id": doc["customer_id"], "actor_id": user["id"], "actor_name": user["name"],
+            "channel": "system", "direction": "internal",
+            "summary": f"Job created: {doc['title']}", "body": "",
+            "created_at": now_iso(),
+        })
     return doc
 
 @api.get("/jobs/{job_id}")
@@ -858,6 +1123,14 @@ async def update_job(job_id: str, body: JobUpdate, user: dict = Depends(get_curr
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Job not found")
     job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if updates.get("status") == "completed" and job.get("customer_id"):
+        await db.communications.insert_one({
+            "id": str(uuid.uuid4()), "company_id": user["company_id"],
+            "customer_id": job["customer_id"], "actor_id": user["id"], "actor_name": user["name"],
+            "channel": "system", "direction": "internal",
+            "summary": f"Job completed: {job['title']}", "body": "",
+            "created_at": now_iso(),
+        })
     return job
 
 @api.delete("/jobs/{job_id}")
@@ -1302,6 +1575,10 @@ async def startup():
     await db.payment_transactions.create_index("session_id", unique=True)
     await db.activity.create_index([("company_id", 1), ("created_at", -1)])
     await db.sessions.create_index("user_id")
+    await db.properties.create_index([("company_id", 1), ("customer_id", 1)])
+    await db.equipment.create_index([("company_id", 1), ("customer_id", 1)])
+    await db.communications.create_index([("company_id", 1), ("customer_id", 1), ("created_at", -1)])
+    await db.customer_files.create_index([("company_id", 1), ("customer_id", 1)])
     await seed_demo()
 
 async def seed_demo():

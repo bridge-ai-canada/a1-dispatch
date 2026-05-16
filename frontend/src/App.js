@@ -11,6 +11,7 @@ import Jobs from "./pages/Jobs";
 import Schedule from "./pages/Schedule";
 import Team from "./pages/Team";
 import Customers from "./pages/Customers";
+import CustomerDetail from "./pages/CustomerDetail";
 import MyJobs from "./pages/MyJobs";
 import Settings from "./pages/Settings";
 import PaymentResult from "./pages/PaymentResult";
@@ -74,6 +75,7 @@ function App() {
                         <Route path="schedule" element={<Schedule />} />
                         <Route path="team" element={<Team />} />
                         <Route path="customers" element={<Customers />} />
+                        <Route path="customers/:id" element={<CustomerDetail />} />
                         <Route path="my-jobs" element={<MyJobs />} />
                         <Route path="settings" element={<Settings />} />
                         <Route path="admin/users" element={<AdminUsers />} />

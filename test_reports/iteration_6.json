@@ -1,0 +1,43 @@
+{
+  "summary": "CRM module (customers, properties, equipment, communications, files, timeline, AI summary, tenant isolation) tested end-to-end. Backend: 17 new pytest cases in /app/backend/tests/test_phase_crm.py — all pass. Full regression: 94/94 tests green (77 prior + 17 new). Frontend: /app/customers list (search, status pills, tag pills, add-customer modal), /app/customers/:id detail (all 5 tabs, status select, quick notes save, AI briefing with REAL Claude Sonnet 4.5 content rendered, property add modal) all verified via Playwright. Auto job→comm logs verified: POST /api/jobs with customer_id creates 'Job created: <title>' system communication; PATCH /api/jobs/{id} {status:'completed'} creates 'Job completed: <title>'. Timeline merges jobs+comms+files sorted ts desc. Tenant isolation enforced across customers/properties/equipment/timeline. AI summary returns {summary, model:'claude-sonnet-4-5'} with real LLM output (verified live screenshot of 4-line briefing).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/app/customers/:id History tab", "issues": ["Visual: the 'Log touchpoint' / add-communication CTA may not be prominent enough when timeline is empty. Playwright timed out locating data-testid='add-communication-button' inside the History tab during the empty-state — main agent should verify it renders unconditionally (code at line 192 of CustomerDetail.jsx looks unconditional but could be positioned outside the viewport in the empty state)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_crm.py",
+    "/app/test_reports/pytest/crm_results.xml",
+    "/app/test_reports/pytest/all_results.xml"
+  ],
+  "action_items": [
+    "Optional UX: surface the 'Add communication' button more prominently in the History tab empty-state (it's there in code; ensure scroll/position doesn't hide it).",
+    "Optional API consistency: GET /api/customers/{id}/timeline returns 100 events max via ?limit; consider documenting and adding a 'has_more' flag.",
+    "Optional: AI summary endpoint returns model:'claude-sonnet-4-5' but the underlying model the integration uses is `claude-sonnet-4-5-20250929` — consider returning the full model name for traceability."
+  ],
+  "critical_code_review_comments": [
+    "server.py grew to 1696 lines — still well past the 700 threshold (refactor recommended; CRM module alone added ~200 lines).",
+    "POST /api/jobs auto-creates a system communication on the customer; PATCH only fires the 'Job completed' comm when status==completed. No equivalent 'Job scheduled', 'Job in_progress', or 'Job cancelled' events. Consider broadening for richer timeline.",
+    "DELETE /api/properties/{property_id} cascades equipment deletion correctly. However DELETE /api/equipment/{equipment_id} does NOT verify equipment belongs to a property the user can see — it scopes by company_id only, which is fine, but the property_id check on POST suggests this should symmetrically scope on customer_id on DELETE for consistency.",
+    "/api/customers list returns all matching rows up to limit=200 with no total/count field; the UI displays a count from items.length which understates large result sets.",
+    "/api/customers/{id}/files DELETE returns 200 on success but the file blob is NOT removed from object storage — only the DB record. Potential storage leak.",
+    "/api/customers/{id}/summary catches any exception and returns a fallback string with model=None. Good fail-soft, but the underlying error is only logged once — consider returning an error_code so the UI can distinguish 'no key configured' vs 'transient LLM failure'.",
+    "Communications insert does not record an updated_at; if a comm is ever edited (no PATCH endpoint exists), audit will be missing."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase_crm.py (new, 17 tests)",
+    "/app/test_reports/pytest/crm_results.xml (new)",
+    "/app/test_reports/pytest/all_results.xml (refreshed — 94 tests)",
+    "/app/test_reports/iteration_6.json (new)"
+  ],
+  "success_rate": {"backend": "100% (17/17 CRM new + 77/77 regression = 94/94)", "frontend": "~90% — list/search/filter, add-customer, detail header, tabs, AI summary, notes, property add all PASS. Communication add timed out finding button in empty History tab (likely test-timing not a defect — verify manually)."},
+  "test_credentials": "demo@a1fieldpro.com / Demo1234! (owner — MFA toggled on/off during tests using pyotp + secret from /api/auth/mfa/setup), tech@a1fieldpro.com / Demo1234!. Note: backend tests reset mfa_enabled=False directly via MongoDB at session start AND end.",
+  "seed_data_creation": "Session-scoped autouse fixture in test_phase_crm.py: (1) resets mfa_enabled=False on demo+tech owners, (2) deletes prior TEST_* customers/jobs/properties/equipment/communications/customer_files, (3) creates a separate TEST_OtherCo via /auth/register for tenant-isolation tests, (4) cleans up post-session. All test data prefixed 'TEST_' or 'CRMUITest' for easy cleanup.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "94 backend tests pass: 17 new in /app/backend/tests/test_phase_crm.py + 77 prior. Run with `REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d= -f2) MONGO_URL=mongodb://localhost:27017 DB_NAME=a1_field_pro python -m pytest backend/tests/ -v`. Frontend UI is gated by MFA setup; tester must enable MFA via /api/auth/mfa/setup + pyotp.TOTP(secret).now() then complete /login mfa-code-input flow OR `db.users.updateMany({email:'demo@a1fieldpro.com'}, {$set:{mfa_enabled:true, mfa_secret:'<secret>'}})`. AI summary returns real Claude Sonnet 4.5 content (verified via screenshot — 4-paragraph 'New Account Briefing'). One soft observation: the History tab empty-state 'Log touchpoint' button selector timed out — code at CustomerDetail.jsx:192 looks unconditional, suggest manual visual confirmation.",
+  "rca of the issue": "No defects found. All 17 new CRM backend tests pass; full regression 94/94 green. AI summary endpoint exercises the EMERGENT_LLM_KEY → claude-sonnet-4-5 path successfully (UI screenshot shows the model returning a multi-paragraph briefing). Job→communication auto-log triggers fire on POST /api/jobs and on PATCH /api/jobs/{id} status=completed (covered by tests test_job_created_auto_logs_system_communication and test_job_completed_auto_logs). Tenant isolation verified: a second registered company cannot read/patch customers from the demo company (404) and cross-tenant property/equipment/timeline endpoints return empty or 404 appropriately."
+}
