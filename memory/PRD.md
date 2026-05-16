@@ -35,26 +35,32 @@ capable, cleaner than Workiz, simpler than ServiceTitan.
 - **Companies & Team**: company seeded on signup; invite dispatchers / technicians; delete members.
 - **Customers CRM**: list + create.
 - **Jobs / Work Orders**: create, edit, delete, filter by status, assign technician, schedule, price.
-- **Dashboard**: KPIs (jobs today, revenue today, active technicians, completion rate), pipeline funnel, recent jobs.
-- **Schedule**: Week-view grid with hour rows + day columns; jobs placed by `scheduled_at` & assignee.
-- **Technician Mobile View** (`/app/my-jobs`): Today / Upcoming / Completed sections, status-advance buttons, one-tap charge.
-- **Stripe Payments**: `/api/payments/checkout` per job, polling-based status verification on success page, transactions persisted, automatic job → completed + paid.
-- **Marketing landing page**: hero, industries strip, features grid, mobile showcase, CTA.
-- **Demo seed**: A1 HVAC N DE-GO company, 3 users (owner/dispatcher/tech), 4 sample jobs.
+- **Dashboard**: KPIs, pipeline funnel, recent jobs.
+- **Schedule**: Week-view grid; jobs placed by `scheduled_at` & assignee.
+- **Technician Mobile View**: Today/Upcoming/Completed, status-advance, one-tap charge.
+- **Stripe Payments**: per-job checkout, polling status, auto job→completed+paid.
+- **Marketing landing page**.
+- **Demo seed**: 1 company, 3 users, 4 sample jobs.
 
-Testing: backend 18/18 pytest pass; frontend critical flows verified via Playwright.
+## What's been implemented (Phase 1 — Feb 2026 — v1.1)
+- **Job detail page** (`/app/jobs/:id`): editable notes, photo upload/grid/delete via Emergent object storage, customer signature pad (canvas → base64 PNG), inline status advance + Stripe charge.
+- **Drag-and-drop schedule**: unscheduled sidebar; drag job onto day/hour cell → PATCH scheduled_at; auto-promotes status.
+- **Public booking widget** (`/book/:companyId`): no-auth customer form → creates an unscheduled job tagged `source=booking_widget`; shareable link with Copy button in Settings.
+- **Multi-tenant file isolation**: `/api/files/{path:path}` validates path prefix against JWT company_id.
+
+Testing: backend 30/30 pytest pass (18 baseline + 12 phase 1); frontend critical flows verified.
 
 ## Backlog (prioritized)
-### P0 — Next session
-- Drag-and-drop on Schedule (currently view-only)
-- Job detail page (notes, photos, signature)
-- Real invoices PDF + email send
+### P0 — Phase 2 (next)
+- PDF invoice generation + email send (Resend or SendGrid — needs API key)
+- White-label settings: logo + primary color upload (UI exists, needs wiring)
+- Emergent-managed Google login
+- MFA via TOTP
 
 ### P1 — Soon
-- White-label settings (logo, primary color upload)
-- Google / Apple social login
-- MFA (TOTP)
-- Customer-facing booking widget
+- Apple login (needs Apple Developer account)
+- Customer-facing booking widget polish (shadcn calendar, embeddable iframe snippet)
+- Job-photo lightbox + lazy loading
 
 ### P2 — Future
 - Route optimization
