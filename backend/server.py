@@ -5,19 +5,65 @@ load_dotenv(ROOT_DIR / ".env")
 
 import os
 import uuid
+import base64
 import logging
 import bcrypt
 import jwt
+import requests
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Literal
 
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, UploadFile, File, Query
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
 from emergentintegrations.payments.stripe.checkout import (
     StripeCheckout, CheckoutSessionRequest,
 )
+
+# -------------------- Storage --------------------
+STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
+EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
+APP_NAME = os.environ.get("APP_NAME", "a1fieldpro")
+_storage_key: Optional[str] = None
+
+def init_storage() -> Optional[str]:
+    global _storage_key
+    if _storage_key:
+        return _storage_key
+    if not EMERGENT_KEY:
+        return None
+    try:
+        r = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
+        r.raise_for_status()
+        _storage_key = r.json()["storage_key"]
+        return _storage_key
+    except Exception as e:
+        logging.error(f"Storage init failed: {e}")
+        return None
+
+def put_object(path: str, data: bytes, content_type: str) -> dict:
+    key = init_storage()
+    if not key:
+        raise HTTPException(status_code=500, detail="Storage unavailable")
+    r = requests.put(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key, "Content-Type": content_type},
+        data=data, timeout=120,
+    )
+    r.raise_for_status()
+    return r.json()
+
+def get_object(path: str):
+    key = init_storage()
+    if not key:
+        raise HTTPException(status_code=500, detail="Storage unavailable")
+    r = requests.get(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key}, timeout=60,
+    )
+    r.raise_for_status()
+    return r.content, r.headers.get("Content-Type", "application/octet-stream")
 
 # -------------------- Config --------------------
 mongo_url = os.environ["MONGO_URL"]
@@ -505,6 +551,148 @@ async def stripe_webhook(request: Request):
                 )
     return {"received": True}
 
+# -------------------- Files / Photos / Signatures --------------------
+class SignatureIn(BaseModel):
+    image_base64: str  # data URL or raw base64
+    signer_name: Optional[str] = ""
+
+@api.post("/jobs/{job_id}/photos")
+async def upload_job_photo(job_id: str, file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    job = await db.jobs.find_one({"id": job_id, "company_id": user["company_id"]}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only images allowed")
+    ext = (file.filename or "img").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else "jpg"
+    if ext not in {"jpg", "jpeg", "png", "webp", "gif"}:
+        ext = "jpg"
+    path = f"{APP_NAME}/{user['company_id']}/jobs/{job_id}/{uuid.uuid4()}.{ext}"
+    data = await file.read()
+    result = put_object(path, data, file.content_type)
+    photo = {
+        "id": str(uuid.uuid4()),
+        "path": result["path"],
+        "content_type": file.content_type,
+        "size": result.get("size", len(data)),
+        "uploaded_by": user["id"],
+        "uploaded_at": now_iso(),
+    }
+    await db.jobs.update_one(
+        {"id": job_id, "company_id": user["company_id"]},
+        {"$push": {"photos": photo}},
+    )
+    return photo
+
+@api.delete("/jobs/{job_id}/photos/{photo_id}")
+async def delete_job_photo(job_id: str, photo_id: str, user: dict = Depends(get_current_user)):
+    result = await db.jobs.update_one(
+        {"id": job_id, "company_id": user["company_id"]},
+        {"$pull": {"photos": {"id": photo_id}}},
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    return {"ok": True}
+
+@api.post("/jobs/{job_id}/signature")
+async def save_signature(job_id: str, body: SignatureIn, user: dict = Depends(get_current_user)):
+    job = await db.jobs.find_one({"id": job_id, "company_id": user["company_id"]}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    raw = body.image_base64
+    if "," in raw:
+        raw = raw.split(",", 1)[1]
+    try:
+        data = base64.b64decode(raw)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid base64 image")
+    path = f"{APP_NAME}/{user['company_id']}/jobs/{job_id}/sig-{uuid.uuid4()}.png"
+    result = put_object(path, data, "image/png")
+    sig = {
+        "path": result["path"],
+        "signer_name": body.signer_name or "",
+        "signed_at": now_iso(),
+    }
+    await db.jobs.update_one(
+        {"id": job_id, "company_id": user["company_id"]},
+        {"$set": {"signature": sig}},
+    )
+    return sig
+
+@api.get("/files/{path:path}")
+async def get_file(path: str, request: Request, auth: Optional[str] = Query(None)):
+    # Accept token from cookie, Authorization header, or ?auth=
+    token = request.cookies.get("access_token") or auth
+    if not token:
+        ah = request.headers.get("Authorization", "")
+        if ah.startswith("Bearer "):
+            token = ah[7:]
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        company_id = payload.get("company_id")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    expected_prefix = f"{APP_NAME}/{company_id}/"
+    if not path.startswith(expected_prefix):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    data, ctype = get_object(path)
+    return Response(content=data, media_type=ctype)
+
+# -------------------- Public Booking Widget --------------------
+class BookingIn(BaseModel):
+    name: str
+    phone: str
+    email: Optional[str] = ""
+    address: str
+    job_type: str = "HVAC"
+    description: str = ""
+    preferred_date: Optional[str] = None  # ISO
+
+@api.get("/public/companies/{company_id}")
+async def public_company(company_id: str):
+    company = await db.companies.find_one({"id": company_id}, {"_id": 0, "owner_id": 0})
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    return company
+
+@api.post("/public/companies/{company_id}/bookings")
+async def public_booking(company_id: str, body: BookingIn):
+    company = await db.companies.find_one({"id": company_id}, {"_id": 0})
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    # Create or reuse customer
+    cust = await db.customers.find_one({"company_id": company_id, "phone": body.phone}, {"_id": 0})
+    if not cust:
+        cust = {
+            "id": str(uuid.uuid4()),
+            "company_id": company_id,
+            "name": body.name, "phone": body.phone, "email": body.email,
+            "address": body.address, "created_at": now_iso(),
+        }
+        await db.customers.insert_one(dict(cust))
+    job = {
+        "id": str(uuid.uuid4()),
+        "company_id": company_id,
+        "title": f"{body.job_type} — {body.name}",
+        "description": body.description,
+        "customer_id": cust["id"],
+        "customer_name": body.name,
+        "customer_phone": body.phone,
+        "address": body.address,
+        "job_type": body.job_type,
+        "assigned_to": None,
+        "scheduled_at": body.preferred_date,
+        "duration_min": 60,
+        "price": 0.0,
+        "status": "unscheduled",
+        "paid": False,
+        "source": "booking_widget",
+        "created_at": now_iso(),
+    }
+    await db.jobs.insert_one(dict(job))
+    return {"ok": True, "job_id": job["id"], "company_name": company["name"]}
+
 # -------------------- Health --------------------
 @api.get("/")
 async def root():
@@ -513,6 +701,7 @@ async def root():
 # -------------------- Startup --------------------
 @app.on_event("startup")
 async def startup():
+    init_storage()
     await db.users.create_index("email", unique=True)
     await db.users.create_index("company_id")
     await db.jobs.create_index([("company_id", 1), ("status", 1)])

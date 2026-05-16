@@ -14,6 +14,8 @@ import Customers from "./pages/Customers";
 import MyJobs from "./pages/MyJobs";
 import Settings from "./pages/Settings";
 import PaymentResult from "./pages/PaymentResult";
+import JobDetail from "./pages/JobDetail";
+import BookingWidget from "./pages/BookingWidget";
 
 function HomeRouter() {
     const { user, loading } = useAuth();
@@ -32,6 +34,7 @@ function App() {
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
                     <Route path="/payment/result" element={<PaymentResult />} />
+                    <Route path="/book/:companyId" element={<BookingWidget />} />
 
                     <Route
                         path="/app"
@@ -44,6 +47,7 @@ function App() {
                         <Route index element={<Navigate to="dashboard" replace />} />
                         <Route path="dashboard" element={<Dashboard />} />
                         <Route path="jobs" element={<Jobs />} />
+                        <Route path="jobs/:id" element={<JobDetail />} />
                         <Route path="schedule" element={<Schedule />} />
                         <Route path="team" element={<Team />} />
                         <Route path="customers" element={<Customers />} />

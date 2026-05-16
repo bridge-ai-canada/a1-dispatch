@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api, { formatApiError } from "../lib/api";
 import { toast } from "sonner";
 import { Plus, X, CreditCard } from "@phosphor-icons/react";
+import { Link } from "react-router-dom";
 
 const STATUS = ["unscheduled", "scheduled", "in_progress", "completed", "cancelled"];
 const STATUS_COLORS = {
@@ -96,7 +97,7 @@ export default function Jobs() {
                         {filtered.map((j) => (
                             <tr key={j.id} className="hover:bg-slate-50">
                                 <td className="px-4 py-3">
-                                    <div className="font-medium" data-testid={`job-title-${j.id}`}>{j.title}</div>
+                                    <Link to={`/app/jobs/${j.id}`} className="font-medium hover:underline" data-testid={`job-title-${j.id}`}>{j.title}</Link>
                                     <div className="text-xs text-slate-500">{j.job_type}</div>
                                 </td>
                                 <td className="px-4 py-3">
