@@ -567,8 +567,13 @@ async def update_user(user_id: str, body: UserUpdateIn, actor: dict = Depends(ge
     if target.get("role") == "owner" and actor["id"] != target["id"]:
         raise HTTPException(status_code=400, detail="Cannot modify the company owner")
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
-    if "role" in updates and updates["role"] not in ROLES:
-        raise HTTPException(status_code=400, detail="Invalid role")
+    if "role" in updates:
+        if updates["role"] not in ROLES:
+            raise HTTPException(status_code=400, detail="Invalid role")
+        if updates["role"] == "super_admin" and actor["role"] != "super_admin":
+            raise HTTPException(status_code=403, detail="Cannot grant super_admin")
+        if updates["role"] == "owner" and actor["role"] != "super_admin":
+            raise HTTPException(status_code=403, detail="Cannot grant owner role")
     if updates:
         await db.users.update_one({"id": user_id}, {"$set": updates})
         await log_activity(actor, "user.updated", "user", user_id, updates)

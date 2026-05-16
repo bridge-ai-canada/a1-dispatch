@@ -57,17 +57,32 @@ Testing: backend 30/30 pytest pass (18 baseline + 12 phase 1); frontend critical
 
 Testing: backend 40/40 pytest pass (30 prior + 10 new); frontend critical flows verified.
 
+## What's been implemented (Phase 2B — Feb 2026 — v1.3)
+- **9 roles + permissions matrix**: `super_admin`, `owner`, `dispatcher`, `office_manager`, `csr`, `technician`, `sales_rep`, `accountant`, `customer`. Permissions checked via `require_perm()`; invitation rights via `INVITE_ALLOWED`. Role escalation guarded (owner cannot promote to `super_admin` or `owner`).
+- **Super admin bootstrap**: seeded from `SUPERADMIN_EMAIL`/`SUPERADMIN_PASSWORD` env on startup; no `company_id`; `?all_tenants=true` returns cross-tenant lists.
+- **TOTP MFA (required for all)**: `/api/auth/mfa/setup` returns QR + base32 secret; `/enable` & `/disable` (password-protected). `Protected` layout redirects `/app/*` to `/setup-mfa` if not enrolled. Login is two-step — backend returns `detail:"mfa_required"` triggers frontend code prompt.
+- **Password reset**: `/api/auth/forgot` returns 200 always; emails reset link via Resend; also returns `reset_url` so owners can copy if email isn't delivered. `/api/auth/reset` updates password and revokes all sessions.
+- **Sessions**: stored on every login with UA/IP; `GET /api/sessions` marks the current; `DELETE /api/sessions/{id}` revokes; revoked sessions block subsequent requests via JWT `sid` claim. Settings → Active Sessions UI.
+- **Activity log**: events auto-emitted on login, invite, role/active changes, MFA on/off, company creation, jobs (planned). RBAC via `activity.read` perm. New `/app/admin/activity` page with action chips.
+- **Admin User Management**: `/app/admin/users` table (name, email, role dropdown, MFA badge, active toggle, deactivate), Invite modal with role selector limited by `INVITE_ALLOWED`, post-invite modal with copy buttons for setup link + temp password. `POST /api/users/invite` sends Resend email and falls back to in-app link reveal.
+- **Resend email**: branded HTML template (`email_layout`) for invites + password reset.
+
+Testing: backend 63/63 pytest pass (40 prior + 23 new); frontend critical flows verified; 0 critical defects (1 minor ObjectId fix + 1 privilege-escalation guard added).
+
 ## Backlog (prioritized)
-### P0 — Phase 2B (next)
+### P0 — Phase 2C (next)
+- Email verification on signup (Resend, optional gate before invoicing)
 - Emergent-managed Google login
-- TOTP MFA enrollment + verification
-- Email invoice send (waiting on Resend or SendGrid API key from user)
+- Apple login (needs Apple Developer account from user)
+- Render uploaded company logo on landing/booking widget headers (saved but not yet displayed)
+- Apply company.branding.primary_color to booking widget header + submit button
 
 ### P1 — Soon
-- Apple login (needs Apple Developer account from user)
-- Logo display on landing/booking widget (currently saved but not yet rendered)
-- Hex color validation (regex) before persisting
-- Split `server.py` into routers (`auth`, `jobs`, `companies`, `files`, `public`, `payments`, `invoice`) — file is now ~920 lines
+- Customer/Homeowner self-service portal (role exists, no UI yet)
+- Job activity events (jobs.created, jobs.completed, payment.received) into activity log
+- Hex color regex validation, password strength rules (uppercase + digit + length≥8)
+- Resend email delivery status surfaced in activity log
+- **Refactor**: split `server.py` (~1300 lines) into `routers/{auth,mfa,sessions,activity,admin,jobs,companies,files,public,payments,invoice}.py`
 
 ### P2 — Future
 - Route optimization
