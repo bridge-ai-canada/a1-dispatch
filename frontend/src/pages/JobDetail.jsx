@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import {
     ArrowLeft, Camera, Trash, CreditCard, FloppyDisk, PencilSimple, Eraser,
-    MapPin, Phone, Clock, CheckCircle, PlayCircle,
+    MapPin, Phone, Clock, CheckCircle, PlayCircle, UploadSimple,
 } from "@phosphor-icons/react";
 
 const STATUS_NEXT = {

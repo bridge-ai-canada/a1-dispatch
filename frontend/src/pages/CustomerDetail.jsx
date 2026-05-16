@@ -27,6 +27,7 @@ export default function CustomerDetail() {
     const [comms, setComms] = useState([]);
     const [files, setFiles] = useState([]);
     const [summary, setSummary] = useState(null);
+    const [nextAction, setNextAction] = useState(null);
     const [summarizing, setSummarizing] = useState(false);
     const [notes, setNotes] = useState("");
     const [savingNotes, setSavingNotes] = useState(false);
@@ -62,8 +63,29 @@ export default function CustomerDetail() {
         try {
             const { data } = await api.get(`/customers/${id}/summary`);
             setSummary(data.summary);
+            setNextAction(data.next_action || null);
         } catch { toast.error("Couldn't summarize"); }
         finally { setSummarizing(false); }
+    };
+
+    const createDraftJob = async (na) => {
+        try {
+            const payload = {
+                title: na.job_title || `Recommended: ${cust.name}`,
+                description: na.description || "",
+                customer_id: id,
+                customer_name: cust.name,
+                customer_phone: cust.phone || "",
+                customer_email: cust.email || "",
+                address: cust.address || "",
+                job_type: na.job_type || "HVAC",
+                price: parseFloat(na.price) || 0,
+                status: "unscheduled",
+            };
+            const { data } = await api.post("/jobs", payload);
+            toast.success("Draft job created — open Work Orders to assign");
+            window.location.href = `/app/jobs/${data.id}`;
+        } catch (err) { toast.error(formatApiError(err.response?.data?.detail) || "Could not create"); }
     };
 
     if (!cust) return <div className="p-8 text-slate-500">Loading...</div>;
@@ -159,6 +181,18 @@ export default function CustomerDetail() {
                         <p className="text-sm text-slate-400 leading-relaxed">
                             Tap Generate to get a 4-line briefing — who they are, recent service pattern, equipment risks, next-best action.
                         </p>
+                    )}
+
+                    {nextAction && (
+                        <div className="border-t border-slate-200 pt-3">
+                            <div className="overline mb-2">Next-best action</div>
+                            <button onClick={() => createDraftJob(nextAction)}
+                                data-testid="ai-next-action-button"
+                                className="w-full bg-[#DC2626] text-white text-sm font-semibold py-2.5 hover:bg-[#B91C1C] flex items-center justify-center gap-1.5">
+                                <Sparkle size={14} weight="fill" /> {nextAction.label}
+                            </button>
+                            <p className="text-[11px] text-slate-400 mt-1.5">Drafts a pre-filled work order — review before saving.</p>
+                        </div>
                     )}
 
                     <div className="border-t border-slate-200 pt-3 space-y-2 text-sm">
