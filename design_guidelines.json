@@ -1,0 +1,109 @@
+{
+  "theme": "Light",
+  "archetype": "4 (Swiss & High-Contrast)",
+  "brand": {
+    "name": "A1 Field Pro",
+    "owner": "A1 HVAC N DE-GO",
+    "primary_color": "#1D4ED8",
+    "accent_color": "#DC2626",
+    "neutral_base": "#FFFFFF"
+  },
+  "typography": {
+    "headings_marketing": "Cabinet Grotesk",
+    "headings_dashboard": "Work Sans",
+    "body": "IBM Plex Sans",
+    "rules": [
+      "No Inter or standard Sans for headings.",
+      "Tight letter spacing on H1/H2 (tracking-tighter).",
+      "Overlines must be uppercase and wide (tracking-[0.2em]).",
+      "Line Height: Tight (leading-none) for headers, Loose (leading-relaxed) for body.",
+      "Hierarchy Gap Rule: The jump between a heading and its subheading must not exceed 2 Tailwind steps."
+    ]
+  },
+  "colors": {
+    "background": "#FFFFFF",
+    "surface": "#F8FAFC",
+    "surface_alt": "#F1F5F9",
+    "border": "#E2E8F0",
+    "border_focus": "#1D4ED8",
+    "text_primary": "#0F172A",
+    "text_secondary": "#475569",
+    "primary": "#1D4ED8",
+    "primary_hover": "#1E40AF",
+    "primary_foreground": "#FFFFFF",
+    "accent": "#DC2626",
+    "accent_hover": "#B91C1C",
+    "accent_foreground": "#FFFFFF",
+    "status": {
+      "success": "#16A34A",
+      "warning": "#D97706",
+      "error": "#DC2626",
+      "info": "#0284C7"
+    }
+  },
+  "layout_and_spacing": {
+    "dashboard_grid": "Mode B: Control Room Grid. Base Grid: grid-cols-1 md:grid-cols-3 lg:grid-cols-4. Tight gaps (gap-4 or gap-6). Override stretch behavior on grid with align-items: start where needed.",
+    "marketing_grid": "Mode A: Tetris Grid. Asymmetric. Wide gaps (gap-8).",
+    "spacing_scale": "Use generous padding for standard components, but dashboard data-heavy widgets can use tighter spacing. Always wrap grid items properly.",
+    "border_radius": "rounded-sm (2px to 4px max) to maintain a technical, authoritative Swiss look. Avoid heavy pill-shaped buttons."
+  },
+  "surface_strategies": {
+    "dashboard_cards": "Grid Borders: Flat background, 1px subtle border (border-border), no shadow. On hover: slight lift (-translate-y-1) and slight shadow if interactive.",
+    "headers": "Solid background with a hard bottom border for dashboard. Crystal glass (backdrop-blur-xl bg-white/70) for marketing page sticky nav.",
+    "mobile_tech_view": "Large touch targets (h-12 or p-4), high-contrast borders separating list items. Focus on 'Clock In/Out' and 'Status Update' via stark color blocks."
+  },
+  "components": {
+    "buttons": "High contrast. Solid background for primary. 1px border for secondary. Add 'hover:bg-opacity-90' or lighter hue for hover state.",
+    "inputs": "Shadcn based. Square or slightly rounded (rounded-sm). 1px border. High contrast focus rings (focus:ring-2 focus:ring-blue-700).",
+    "charts": "Shadcn charts or Recharts. Sharp lines, clear data points. Tooltips must have 1px border.",
+    "calendar": "Drag and drop capability, distinct color markers using primary (Blue) and accent (Red) for status. Use a dense but legible grid."
+  },
+  "media": {
+    "image_urls": [
+      {
+        "url": "https://static.prod-images.emergentagent.com/jobs/69c67260-dedd-4606-94d4-9ad133f7b092/images/f3d45e013f5b8b65923badcaec9a5ae614860b6ec80845d162f8ea44560e52f7.png",
+        "category": "hero",
+        "description": "Marketing landing page hero image representing a sleek, modern command center / high-tech dashboard."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1621905251918-48416bd8575a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTJ8MHwxfHNlYXJjaHwyfHxodmFjJTIwdGVjaG5pY2lhbiUyMHdvcmtpbmd8ZW58MHx8fHwxNzc4OTQ5ODEwfDA&ixlib=rb-4.1.0&q=85",
+        "category": "technician_feature",
+        "description": "HVAC technician working, useful for features or about sections on the marketing page."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTJ8MHwxfHNlYXJjaHwxfHxodmFjJTIwdGVjaG5pY2lhbiUyMHdvcmtpbmd8ZW58MHx8fHwxNzc4OTQ5ODEwfDA&ixlib=rb-4.1.0&q=85",
+        "category": "technician_portrait",
+        "description": "HVAC technician holding a tool, useful for mobile app view mockup or profile placeholder."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1542013936693-884638332954?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MjJ8MHwxfHNlYXJjaHwxfHxwbHVtYmVyJTIwc2lua3xlbnwwfHx8fDE3Nzg5NDk4MTB8MA&ixlib=rb-4.1.0&q=85",
+        "category": "plumbing_service",
+        "description": "Plumber working on sink, useful for marketing page service list."
+      }
+    ]
+  },
+  "icons": {
+    "library": "@phosphor-icons/react",
+    "instructions": "Use Phosphor Icons (regular or duotone depending on section) for a clean, dense dashboard look. Install via yarn add @phosphor-icons/react"
+  },
+  "motion_and_interactions": {
+    "hover_states": "Must explicitly set text color on hover. Increase contrast.",
+    "transitions": "Use specific properties (transition: transform 0.2s ease, opacity 0.2s ease). Do not use transition-all.",
+    "focus_states": "High contrast focus rings mandatory."
+  },
+  "accessibility": {
+    "contrast": "Minimum 4.5:1 for normal text.",
+    "testing": "All interactive elements (buttons, links, form inputs) MUST include data-testid attribute using kebab-case role-based naming (e.g., data-testid='submit-work-order-button')."
+  },
+  "instructions_to_main_agent": [
+    "Use pure HTML + Tailwind for the Marketing Page to allow overlapping and asymmetry. Avoid restricting it with Shadcn structural components.",
+    "Use heavily customized Shadcn components for the Admin Dashboard.",
+    "Override default Shadcn rounding to rounded-sm (2px) or rounded-none to match the Swiss architecture theme.",
+    "Implement the Dashboard 'Jobs/Work Orders' Kanban or Table using dense UI practices, exposing data clearly without relying on large cards.",
+    "Mobile view for technicians must be extremely legible with large touch targets (min h-12 for primary actions) and focus on immediate task completion.",
+    "Install @phosphor-icons/react for icons.",
+    "Implement data-testid attributes universally for testing.",
+    "For the calendar scheduling UI, ensure dense yet clear views with primary and accent color indicators.",
+    "Apply 'Swiss' layout rules: optical alignment, grid utilization, and negative space that frames data."
+  ]
+}
