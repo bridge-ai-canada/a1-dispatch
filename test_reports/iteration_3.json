@@ -1,0 +1,37 @@
+{
+  "summary": "Phase 2A (white-label branding + invoice PDF + booking widget polish) fully validated. Backend: 10/10 new pytest cases pass (companies/me GET/PATCH including 403 non-owner + 401 unauth, logo upload owner/non-owner, invoice PDF auth gate, valid PDF magic bytes, paid stamp variant, cross-tenant 404). 40/40 total tests pass (no regression). Frontend: Settings shows logo upload button, 5 color presets, primary/accent color pickers, Save branding (toast 'Branding saved' shown), embed snippet textarea + Copy, booking link + Copy/Open. JobDetail has 'Invoice PDF' anchor with target=_blank pointing to ${API_BASE}/jobs/{id}/invoice.pdf.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Settings", "issues": ["Toast 'Branding saved' overlaps top-right user menu; consider repositioning toast container below header (minor)"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase2.py",
+    "/app/test_reports/pytest/phase2_results.xml",
+    "/app/backend/tests/test_phase1.py",
+    "/app/backend/tests/test_a1fieldpro.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now ~923 lines (exceeds 700 threshold) — strongly recommend splitting into routers/{auth,jobs,companies,files,public,payments,invoice}.py before adding more features.",
+    "POST /api/companies/me/logo returns only {\"path\": ...} while PATCH /companies/me returns full company doc — inconsistent shape. Consider returning the full company doc from logo upload too (UI currently re-fetches via /companies/me).",
+    "Invoice PDF is served same-origin via httpOnly cookie — anchor target=_blank works in Chrome/Edge/Firefox; Safari ITP may not send cookies on top-level navigation to subdomain in some configurations. Consider a short-lived signed URL or token query param fallback (same pattern as /api/files).",
+    "BrandingIn currently only accepts primary_color & accent_color — logo_path is set server-side via the upload endpoint (good), but consider validating hex format with a regex (^#[0-9A-Fa-f]{6}$) to avoid bad CSS values being persisted.",
+    "PDF endpoint loads reportlab on every request — fine for low volume, but if usage grows, cache styled fonts/canvases or generate async."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase2.py",
+    "/app/test_reports/iteration_3.json",
+    "/app/test_reports/pytest/phase2_results.xml"
+  ],
+  "success_rate": {"backend": "100% (10/10 new + 30/30 prior = 40/40)", "frontend": "100% on critical Phase 2A flows"},
+  "test_credentials": "demo@a1fieldpro.com / Demo1234! (owner), tech@a1fieldpro.com / Demo1234! (used for 403 checks)",
+  "seed_data_creation": "Tests create+cleanup TEST_ prefixed jobs (e.g. TEST_PaidInvoice). Cross-tenant test creates TEST_IsoBrand tenant (not deleted — same pattern as existing test_multi_tenant_isolation).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Phase 2A validated end-to-end. Invoice PDF verified via %PDF magic bytes + content-type. Cross-tenant 404 confirmed. Branding patch persists to mongo (verified via follow-up GET). Logo upload returns {path} only — UI should refetch /companies/me to display new logo (verify next iteration when UI displays the uploaded logo image). Email + Google/MFA still deferred.",
+  "rca of the issue": "N/A — no defects found in Phase 2A. Initial test failure on test_upload_logo_owner was a test-side assumption (expected full company doc); corrected to assert response.path + verify persistence via GET /companies/me. Endpoint behavior is correct, but shape inconsistency vs PATCH /companies/me flagged in code review."
+}

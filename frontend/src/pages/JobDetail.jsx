@@ -103,6 +103,12 @@ export default function JobDetail() {
                     <h1 className="font-display text-4xl font-extrabold tracking-tighter mt-1" data-testid="job-detail-title">{job.title}</h1>
                 </div>
                 <div className="flex items-center gap-2">
+                    <a href={`${API_BASE}/jobs/${id}/invoice.pdf`}
+                        target="_blank" rel="noopener noreferrer"
+                        data-testid="download-invoice-button"
+                        className="flex items-center gap-1.5 px-4 py-2.5 border border-slate-300 hover:bg-slate-50 font-semibold text-sm">
+                        Invoice PDF
+                    </a>
                     {!job.paid && job.price > 0 && (
                         <button onClick={charge} data-testid="detail-charge-button"
                             className="flex items-center gap-1.5 px-4 py-2.5 border border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-semibold">

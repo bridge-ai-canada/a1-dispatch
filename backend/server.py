@@ -184,6 +184,12 @@ class CustomerIn(BaseModel):
     email: Optional[str] = ""
     address: Optional[str] = ""
 
+class BrandingIn(BaseModel):
+    primary_color: Optional[str] = None
+    accent_color: Optional[str] = None
+    logo_path: Optional[str] = None
+
+
 class JobIn(BaseModel):
     title: str
     description: Optional[str] = ""
@@ -272,6 +278,26 @@ async def me(user: dict = Depends(get_current_user)):
 async def my_company(user: dict = Depends(get_current_user)):
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
     return company
+
+@api.patch("/companies/me")
+async def update_company(body: BrandingIn, user: dict = Depends(require_role("owner"))):
+    updates = {f"branding.{k}": v for k, v in body.model_dump().items() if v is not None}
+    if updates:
+        await db.companies.update_one({"id": user["company_id"]}, {"$set": updates})
+    return await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
+
+@api.post("/companies/me/logo")
+async def upload_logo(file: UploadFile = File(...), user: dict = Depends(require_role("owner"))):
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only images allowed")
+    ext = (file.filename or "logo").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else "png"
+    path = f"{APP_NAME}/{user['company_id']}/branding/logo-{uuid.uuid4()}.{ext}"
+    data = await file.read()
+    result = put_object(path, data, file.content_type)
+    await db.companies.update_one(
+        {"id": user["company_id"]}, {"$set": {"branding.logo_path": result["path"]}}
+    )
+    return {"path": result["path"]}
 
 @api.get("/team")
 async def list_team(user: dict = Depends(get_current_user)):
@@ -692,6 +718,102 @@ async def public_booking(company_id: str, body: BookingIn):
     }
     await db.jobs.insert_one(dict(job))
     return {"ok": True, "job_id": job["id"], "company_name": company["name"]}
+
+@api.get("/jobs/{job_id}/invoice.pdf")
+async def invoice_pdf(job_id: str, user: dict = Depends(get_current_user)):
+    from io import BytesIO
+    from reportlab.lib.pagesizes import LETTER
+    from reportlab.lib.units import inch
+    from reportlab.pdfgen import canvas as pdfcanvas
+    from reportlab.lib.colors import HexColor
+
+    job = await db.jobs.find_one({"id": job_id, "company_id": user["company_id"]}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0}) or {}
+    primary = (company.get("branding") or {}).get("primary_color") or "#1D4ED8"
+    accent  = (company.get("branding") or {}).get("accent_color") or "#DC2626"
+
+    buf = BytesIO()
+    c = pdfcanvas.Canvas(buf, pagesize=LETTER)
+    W, H = LETTER
+
+    # Header bar
+    c.setFillColor(HexColor(primary))
+    c.rect(0, H - 0.9*inch, W, 0.9*inch, fill=1, stroke=0)
+    c.setFillColor(HexColor("#FFFFFF"))
+    c.setFont("Helvetica-Bold", 22)
+    c.drawString(0.6*inch, H - 0.55*inch, company.get("name", "A1 Field Pro"))
+    c.setFont("Helvetica", 10)
+    c.drawString(0.6*inch, H - 0.75*inch, f"{company.get('industry','')} · INVOICE")
+
+    # Invoice meta
+    c.setFillColor(HexColor("#0F172A"))
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(0.6*inch, H - 1.4*inch, "INVOICE")
+    c.setFont("Helvetica", 10)
+    c.drawString(0.6*inch, H - 1.6*inch, f"Job #: {job['id'][:8].upper()}")
+    c.drawString(0.6*inch, H - 1.75*inch, f"Date: {datetime.now(timezone.utc).strftime('%b %d, %Y')}")
+
+    # Bill to
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(0.6*inch, H - 2.2*inch, "BILL TO")
+    c.setFont("Helvetica", 10)
+    c.drawString(0.6*inch, H - 2.4*inch, job.get("customer_name") or "Customer")
+    if job.get("address"):  c.drawString(0.6*inch, H - 2.55*inch, job["address"])
+    if job.get("customer_phone"): c.drawString(0.6*inch, H - 2.70*inch, job["customer_phone"])
+
+    # Line item table header
+    y = H - 3.4*inch
+    c.setFillColor(HexColor("#F1F5F9"))
+    c.rect(0.6*inch, y - 0.05*inch, W - 1.2*inch, 0.3*inch, fill=1, stroke=0)
+    c.setFillColor(HexColor("#0F172A"))
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(0.7*inch, y + 0.05*inch, "DESCRIPTION")
+    c.drawRightString(W - 0.7*inch, y + 0.05*inch, "AMOUNT")
+
+    # Line item
+    y -= 0.45*inch
+    c.setFont("Helvetica", 11)
+    c.drawString(0.7*inch, y, job.get("title", "Service"))
+    c.drawRightString(W - 0.7*inch, y, f"${(job.get('price') or 0):.2f}")
+    if job.get("description"):
+        y -= 0.2*inch
+        c.setFont("Helvetica-Oblique", 9)
+        c.setFillColor(HexColor("#475569"))
+        for line in (job["description"] or "")[:400].split("\n")[:4]:
+            c.drawString(0.7*inch, y, line[:90])
+            y -= 0.15*inch
+        c.setFillColor(HexColor("#0F172A"))
+
+    # Total
+    y = 2.0*inch
+    c.setStrokeColor(HexColor("#E2E8F0"))
+    c.line(0.6*inch, y + 0.4*inch, W - 0.6*inch, y + 0.4*inch)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawRightString(W - 1.8*inch, y, "TOTAL")
+    c.setFillColor(HexColor(accent))
+    c.drawRightString(W - 0.7*inch, y, f"${(job.get('price') or 0):.2f}")
+    c.setFillColor(HexColor("#0F172A"))
+
+    # Status stamp
+    if job.get("paid"):
+        c.setFillColor(HexColor("#16A34A"))
+        c.setFont("Helvetica-Bold", 22)
+        c.drawString(0.7*inch, y - 0.2*inch, "PAID")
+        c.setFillColor(HexColor("#0F172A"))
+
+    # Footer
+    c.setFont("Helvetica", 8)
+    c.setFillColor(HexColor("#94A3B8"))
+    c.drawString(0.6*inch, 0.6*inch, f"Thank you for your business — {company.get('name','')}")
+    c.drawRightString(W - 0.6*inch, 0.6*inch, "Powered by A1 Field Pro")
+
+    c.showPage()
+    c.save()
+    pdf = buf.getvalue()
+    return Response(content=pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="invoice-{job["id"][:8]}.pdf"'})
 
 # -------------------- Health --------------------
 @api.get("/")
