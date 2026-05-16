@@ -71,11 +71,10 @@ export default function BookingWidget() {
             <div className="max-w-xl mx-auto">
                 <div className="text-center mb-8">
                     {logoUrl ? (
-                        <img src={logoUrl} alt={company.name} className="mx-auto mb-4 max-h-16" />
+                        <img src={logoUrl} alt={company.name} className="mx-auto mb-4 max-h-20" />
                     ) : (
-                        <div className="inline-flex items-center gap-2 text-xs font-semibold tracking-[0.2em] uppercase" style={{ color: primary }}>
-                            <Wrench size={14} weight="duotone" /> Book a service
-                        </div>
+                        <img src="https://customer-assets.emergentagent.com/job_a1-dispatch/artifacts/fpgawcoi_1000287215.png"
+                            alt="A1 Field Pro" className="mx-auto mb-4 h-16 w-auto" />
                     )}
                     <h1 className="font-display text-4xl font-extrabold tracking-tighter mt-3">{company.name}</h1>
                     <p className="text-slate-500 mt-2">{company.industry} · Request a callback in 2 minutes</p>

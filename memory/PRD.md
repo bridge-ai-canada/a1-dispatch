@@ -78,16 +78,20 @@ Testing: backend 63/63 pytest pass (40 prior + 23 new); frontend critical flows 
 
 Testing: backend **77/77** pytest pass (14 new + 63 prior); frontend critical flows verified; 0 defects.
 
+## What's been implemented (Polish — Feb 2026 — v1.5)
+- **Official logo** uploaded by owner (A1 Field Pro on dark navy with HVAC mark) is now used as the default everywhere via the `Brand` component; `BookingWidget` falls back to this logo when a tenant has no custom branding logo.
+- **Brand component is auth-aware**: when a user is logged in and their company has a `branding.logo_path`, the layout/landing nav automatically renders the company logo instead of the A1 default — true white-label across the app for staff users.
+- **Database indexes** added on `jobs.customer_email` (portal scaling), `activity.(company_id, created_at)`, `sessions.user_id` for query performance at scale.
+
 ## Backlog (prioritized)
-### P0 — Phase 3 (next)
+### P0 — Phase 3 (next, dedicated)
+- **Refactor `server.py`** (~1,420 lines) → `deps.py` + `routers/{auth,admin,jobs,companies,public,portal,payments}.py`. Pure code reorganisation that risks breaking the 77 passing tests — should be a single-purpose round with 100% test re-run before merge.
 - Apple login (still needs Apple Developer account from user)
-- Refactor `server.py` (~1400 lines) into `routers/{auth,mfa,sessions,activity,admin,jobs,companies,files,public,payments,invoice,portal}.py`
-- Verify-email gate: after invoice send, require email_verified before payment-link
 
 ### P1 — Soon
-- Index on `jobs.customer_email` for portal scaling
-- Industry icon placeholder on booking widget when no logo
-- Apply branding to landing nav (when logged-in user has a branded company)
+- Verify-email gate before payment-link send
+- Customer portal: rate the technician + tip after a completed visit
+- Industry icon palette (HVAC/Plumbing/Electrical) when the booking widget has no logo configured
 - Job activity events (`jobs.created`, `jobs.completed`, `payment.received`) into activity log
 - Booking endpoint returns full job object for consistency
 - Hex color regex validation, password strength rules

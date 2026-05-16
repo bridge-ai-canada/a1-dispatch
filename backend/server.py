@@ -1297,8 +1297,11 @@ async def startup():
     await db.users.create_index("company_id")
     await db.jobs.create_index([("company_id", 1), ("status", 1)])
     await db.jobs.create_index([("company_id", 1), ("assigned_to", 1)])
+    await db.jobs.create_index("customer_email")
     await db.customers.create_index("company_id")
     await db.payment_transactions.create_index("session_id", unique=True)
+    await db.activity.create_index([("company_id", 1), ("created_at", -1)])
+    await db.sessions.create_index("user_id")
     await seed_demo()
 
 async def seed_demo():
