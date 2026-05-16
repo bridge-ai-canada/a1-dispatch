@@ -69,20 +69,29 @@ Testing: backend 40/40 pytest pass (30 prior + 10 new); frontend critical flows 
 
 Testing: backend 63/63 pytest pass (40 prior + 23 new); frontend critical flows verified; 0 critical defects (1 minor ObjectId fix + 1 privilege-escalation guard added).
 
+## What's been implemented (Phase 2C — Feb 2026 — v1.4)
+- **Email verification**: register sends Resend verification email best-effort; `POST /api/auth/verify?token=...`; `POST /api/auth/verify/resend`; non-blocking amber banner in app shell prompts unverified users.
+- **Emergent Google login**: "Continue with Google" buttons on `/login` + `/register`; `AuthCallback` page processes `#session_id=...` synchronously (race-condition-safe); backend `/api/auth/google/exchange` calls Emergent's session-data endpoint, links existing users by email, creates new users as `customer` role (`company_id=null`) for homeowners.
+- **Customer self-service portal** (`/portal`): no-auth landing card → Continue with Google; auth'd portal lists Upcoming / Pending / Past visits scoped by `customer_email==user.email` across all tenants; PDF invoice link on past visits; quick-book buttons for any company they've worked with.
+- **Branded booking widget**: `/book/:companyId` reads `company.branding` and applies `primary_color` to header overline + `accent_color` to submit button; renders uploaded `logo_path` if present.
+- **Job model extended** with `customer_email` so portal scoping works; public booking persists it.
+
+Testing: backend **77/77** pytest pass (14 new + 63 prior); frontend critical flows verified; 0 defects.
+
 ## Backlog (prioritized)
-### P0 — Phase 2C (next)
-- Email verification on signup (Resend, optional gate before invoicing)
-- Emergent-managed Google login
-- Apple login (needs Apple Developer account from user)
-- Render uploaded company logo on landing/booking widget headers (saved but not yet displayed)
-- Apply company.branding.primary_color to booking widget header + submit button
+### P0 — Phase 3 (next)
+- Apple login (still needs Apple Developer account from user)
+- Refactor `server.py` (~1400 lines) into `routers/{auth,mfa,sessions,activity,admin,jobs,companies,files,public,payments,invoice,portal}.py`
+- Verify-email gate: after invoice send, require email_verified before payment-link
 
 ### P1 — Soon
-- Customer/Homeowner self-service portal (role exists, no UI yet)
-- Job activity events (jobs.created, jobs.completed, payment.received) into activity log
-- Hex color regex validation, password strength rules (uppercase + digit + length≥8)
+- Index on `jobs.customer_email` for portal scaling
+- Industry icon placeholder on booking widget when no logo
+- Apply branding to landing nav (when logged-in user has a branded company)
+- Job activity events (`jobs.created`, `jobs.completed`, `payment.received`) into activity log
+- Booking endpoint returns full job object for consistency
+- Hex color regex validation, password strength rules
 - Resend email delivery status surfaced in activity log
-- **Refactor**: split `server.py` (~1300 lines) into `routers/{auth,mfa,sessions,activity,admin,jobs,companies,files,public,payments,invoice}.py`
 
 ### P2 — Future
 - Route optimization
