@@ -1,0 +1,41 @@
+{
+    "name": "A1 Field Pro",
+    "short_name": "A1 Field",
+    "description": "Field service ops, scheduling, payments, and customer portal for A1 HVAC N DE-GO.",
+    "id": "/?source=pwa",
+    "start_url": "/app/my-jobs?source=pwa",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "background_color": "#0F172A",
+    "theme_color": "#1D4ED8",
+    "categories": ["business", "productivity"],
+    "icons": [
+        {
+            "src": "https://customer-assets.emergentagent.com/job_a1-dispatch/artifacts/fpgawcoi_1000287215.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "https://customer-assets.emergentagent.com/job_a1-dispatch/artifacts/fpgawcoi_1000287215.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Today's jobs",
+            "short_name": "Today",
+            "url": "/app/my-jobs?source=pwa",
+            "description": "Today's route for technicians"
+        },
+        {
+            "name": "Schedule",
+            "short_name": "Schedule",
+            "url": "/app/schedule?source=pwa",
+            "description": "Dispatch board"
+        }
+    ]
+}

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1D4ED8" />
+    <title>Offline · A1 Field Pro</title>
+    <style>
+        :root { --ink:#0F172A; --paper:#F8FAFC; --primary:#1D4ED8; --accent:#DC2626; }
+        * { box-sizing:border-box }
+        body {
+            margin:0; min-height:100vh;
+            display:flex; align-items:center; justify-content:center;
+            font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+            background:var(--paper); color:var(--ink); padding:24px;
+        }
+        .card {
+            background:#fff; border:1px solid #E2E8F0; max-width:420px; width:100%;
+            padding:40px 32px; text-align:center;
+        }
+        .badge {
+            display:inline-block; padding:4px 10px; border:1px solid var(--accent); color:var(--accent);
+            font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase;
+        }
+        h1 { font-size:32px; font-weight:800; letter-spacing:-0.02em; margin:16px 0 8px }
+        p { color:#475569; line-height:1.55; margin:0 0 24px }
+        button {
+            background:var(--primary); color:#fff; border:0;
+            padding:14px 28px; font-size:14px; font-weight:700; cursor:pointer;
+            letter-spacing:0.02em;
+        }
+        button:hover { opacity:.9 }
+        .hint { font-size:11px; color:#94A3B8; margin-top:16px; letter-spacing:0.08em; text-transform:uppercase }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <span class="badge">Offline</span>
+        <h1>Hold tight — you're off-grid</h1>
+        <p>A1 Field Pro can't reach the dispatch server. Your last-loaded jobs and customer notes are still available inside the app. Reconnect to sync new updates.</p>
+        <button onclick="location.reload()">Try again</button>
+        <div class="hint">A1 HVAC N DE-GO · A1 Field Pro</div>
+    </div>
+</body>
+</html>

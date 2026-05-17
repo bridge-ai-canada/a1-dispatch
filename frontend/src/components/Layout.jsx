@@ -10,6 +10,7 @@ import {
 import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { toast } from "sonner";
+import OfflineIndicator from "./OfflineIndicator";
 
 const baseNav = [
     { to: "/app/dashboard", label: "Dashboard", icon: SquaresFour, roles: ["owner","dispatcher","office_manager","csr","sales_rep","accountant","technician"] },
@@ -40,6 +41,7 @@ export default function Layout() {
 
     return (
         <div className="min-h-screen bg-white text-slate-900">
+            <OfflineIndicator />
             {/* Top bar */}
             <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
                 <div className="flex h-14 items-center justify-between px-4 md:px-6">

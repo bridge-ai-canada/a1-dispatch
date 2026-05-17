@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api, { formatApiError } from "../lib/api";
 import { toast } from "sonner";
 import { MapPin, Phone, Clock, CheckCircle, PlayCircle, CreditCard } from "@phosphor-icons/react";
+import InstallPrompt from "../components/InstallPrompt";
 
 const STATUS_NEXT = {
     scheduled: { label: "Start Job", next: "in_progress", color: "bg-[#1D4ED8]", icon: PlayCircle },
@@ -51,6 +52,8 @@ export default function MyJobs() {
                 <h1 className="font-display text-4xl font-extrabold tracking-tighter mt-1">My Jobs</h1>
                 <p className="text-sm text-slate-500 mt-2">{todays.length} job{todays.length === 1 ? "" : "s"} today</p>
             </div>
+
+            <InstallPrompt variant="card" />
 
             <Section title="Today" jobs={todays} setStatus={setStatus} charge={charge} highlight />
             <Section title="Upcoming" jobs={upcoming} setStatus={setStatus} charge={charge} />

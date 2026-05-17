@@ -104,6 +104,18 @@ Testing: backend **77/77** pytest pass (14 new + 63 prior); frontend critical fl
 
 Testing: 146 baseline + 35 new = **181/181 backend tests green**, 0 critical issues.
 
+## What's been implemented (PWA — Feb 2026 — v1.9)
+- **Progressive Web App**: A1 Field Pro is now installable on iOS & Android home screens.
+  - `/public/manifest.json` — standalone display, brand colors, A1 logo as icon (192/512), shortcuts to Today's Jobs + Schedule.
+  - `/public/sw.js` — install/activate/fetch handlers. Strategy: network-first for `/api/*` (with stale-cache fallback when offline), cache-first for static assets, network-first with `/offline.html` fallback for navigations. Auth & payment endpoints intentionally bypass cache.
+  - `/public/offline.html` — branded offline page (red OFFLINE badge, "Try again" button).
+  - PWA meta tags in `index.html` (theme-color, apple-touch-icon, apple-mobile-web-app-capable, viewport-fit=cover).
+  - `src/lib/pwa.js` — service-worker registration + `beforeinstallprompt` brokering.
+  - `src/components/InstallPrompt.jsx` — install banner/card with iOS "Add to Home Screen" walkthrough modal (3-step guide). Auto-hides when already installed or dismissed; LocalStorage-persisted dismissal.
+  - `src/components/OfflineIndicator.jsx` — red top-bar strip when `navigator.onLine === false`.
+  - Web-push scaffolding in `sw.js` (push + notificationclick handlers) ready for future Twilio/Web-Push backend integration.
+- **Result**: Technicians on real iOS Safari can tap Share → Add to Home Screen and launch A1 Field Pro fullscreen. Android Chrome shows the native install banner. SW caches the latest `/api/jobs` response so off-grid techs still see their day's route.
+
 ## What's been implemented (Refactor + Polish — Feb 2026 — v1.7)
 - **Backend refactor**: `server.py` cut from ~1,400 → 175 lines. Routes now split across `/app/backend/routers/` modules: `auth.py`, `admin.py`, `companies.py`, `customers.py`, `jobs.py`, `payments.py`, `public_routes.py`, `portal.py`. Shared infra remains in `deps.py`. Mounted via single `APIRouter(prefix="/api")` in `server.py`. **120/120 tests still pass** (no behavior change).
 - **Industry icon palette** on `BookingWidget` when a company hasn't uploaded a logo: per-industry phosphor icon (Snowflake/Drop/Lightning/Garage/House/Plug/Wrench) on a rounded tile tinted with `branding.primary_color`. Contrast-aware foreground (white on dark, ink on light).
@@ -135,16 +147,19 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - ✅ Analytics CSV exports
 - ✅ Route optimization (ZIP-based heuristic)
 
+### v1.9 — Done
+- ✅ PWA (installable, offline-capable, push-ready)
+
 ### P1 — Remaining
 - Apple login (needs Apple Developer credentials from user)
 
 ### P2 — Future
 - Android login (needs Google Play Developer credentials)
-- React Native mobile app
+- Backend Web-Push trigger pipeline (subscription endpoint + VAPID keys + send-on-event hooks)
 - Real geocoding for route optimization (Google Maps / Mapbox API)
 - SMS notifications (Twilio — needs credentials)
 - Booking-confirmation email back to customers
-- Recurring email delivery status surfacing (admin UI showing email log filter)
+- Native React Native app (separate codebase, requires local Xcode/Expo build environment)
 
 ## Demo credentials
 Owner: `demo@a1fieldpro.com` / `Demo1234!`
