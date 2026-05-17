@@ -37,6 +37,10 @@ EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 APP_NAME = os.environ.get("APP_NAME", "a1fieldpro")
 STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
 
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "").replace("\\n", "\n")
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:admin@a1fieldpro.com")
+
 if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
 

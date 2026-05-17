@@ -72,6 +72,24 @@ async def create_job(body: JobIn, user: dict = Depends(get_current_user)):
             "summary": f"Job created: {doc['title']}", "body": "",
             "created_at": now_iso(),
         })
+    # Push notification to the assigned tech (if any)
+    if doc.get("assigned_to") and doc["assigned_to"] != user["id"]:
+        try:
+            from push_service import send_push_to_user
+            when = ""
+            if doc.get("scheduled_at"):
+                try:
+                    when = " · " + datetime.fromisoformat(doc["scheduled_at"]).strftime("%a %I:%M %p")
+                except Exception:
+                    pass
+            await send_push_to_user(doc["assigned_to"], {
+                "title": "New job assigned",
+                "body": f'{doc["title"]}{when}',
+                "url": f'/app/jobs/{doc["id"]}',
+                "tag": f'job-{doc["id"]}',
+            })
+        except Exception:
+            pass
     return doc
 
 
@@ -94,6 +112,11 @@ async def update_job(job_id: str, body: JobUpdate, user: dict = Depends(get_curr
         )
         if existing and existing.get("status") == "unscheduled":
             updates["status"] = "scheduled"
+    # Capture prior assignee so we can notify on reassignment
+    prior = await db.jobs.find_one(
+        {"id": job_id, "company_id": user["company_id"]},
+        {"_id": 0, "assigned_to": 1, "scheduled_at": 1, "title": 1},
+    )
     updates["updated_at"] = now_iso()
     result = await db.jobs.update_one(
         {"id": job_id, "company_id": user["company_id"]}, {"$set": updates}
@@ -114,6 +137,33 @@ async def update_job(job_id: str, body: JobUpdate, user: dict = Depends(get_curr
             "summary": f"Job {verb}: {job['title']}", "body": "",
             "created_at": now_iso(),
         })
+    # Push to newly-assigned tech (or notify of reschedule to current tech)
+    try:
+        from push_service import send_push_to_user
+        new_tech = updates.get("assigned_to")
+        reschedule = "scheduled_at" in updates
+        target_tech = new_tech if (new_tech and new_tech != (prior or {}).get("assigned_to")) else None
+        notify_kind = None
+        if target_tech and target_tech != user["id"]:
+            notify_kind = ("New job assigned", target_tech)
+        elif reschedule and job.get("assigned_to") and job["assigned_to"] != user["id"]:
+            notify_kind = ("Job rescheduled", job["assigned_to"])
+        if notify_kind:
+            title, recipient = notify_kind
+            when = ""
+            if job.get("scheduled_at"):
+                try:
+                    when = " · " + datetime.fromisoformat(job["scheduled_at"]).strftime("%a %I:%M %p")
+                except Exception:
+                    pass
+            await send_push_to_user(recipient, {
+                "title": title,
+                "body": f'{job.get("title","")}{when}',
+                "url": f'/app/jobs/{job_id}',
+                "tag": f'job-{job_id}',
+            })
+    except Exception:
+        pass
     return job
 
 

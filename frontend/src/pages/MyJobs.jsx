@@ -3,6 +3,7 @@ import api, { formatApiError } from "../lib/api";
 import { toast } from "sonner";
 import { MapPin, Phone, Clock, CheckCircle, PlayCircle, CreditCard } from "@phosphor-icons/react";
 import InstallPrompt from "../components/InstallPrompt";
+import PushOptIn from "../components/PushOptIn";
 
 const STATUS_NEXT = {
     scheduled: { label: "Start Job", next: "in_progress", color: "bg-[#1D4ED8]", icon: PlayCircle },
@@ -54,6 +55,7 @@ export default function MyJobs() {
             </div>
 
             <InstallPrompt variant="card" />
+            <PushOptIn />
 
             <Section title="Today" jobs={todays} setStatus={setStatus} charge={charge} highlight />
             <Section title="Upcoming" jobs={upcoming} setStatus={setStatus} charge={charge} />
