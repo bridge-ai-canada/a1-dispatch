@@ -19,10 +19,12 @@ async def ws_endpoint(websocket: WebSocket, token: str = Query(...)):
         user_id = payload.get("sub")
         company_id = payload.get("company_id")
     except jwt.InvalidTokenError:
-        await websocket.close(code=4401)
+        await websocket.accept()
+        await websocket.close(code=4401, reason="invalid token")
         return
     if not user_id or not company_id:
-        await websocket.close(code=4401)
+        await websocket.accept()
+        await websocket.close(code=4401, reason="missing claims")
         return
     await websocket.accept()
     await hub.join(company_id, websocket)

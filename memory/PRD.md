@@ -104,6 +104,32 @@ Testing: backend **77/77** pytest pass (14 new + 63 prior); frontend critical fl
 
 Testing: 146 baseline + 35 new = **181/181 backend tests green**, 0 critical issues.
 
+## What's been implemented (Modern Dispatch Board — Feb 2026 — v1.12)
+
+### Backend
+- **WebSocket pub/sub** (`ws_hub.py`): in-memory company-scoped rooms. `/api/ws?token=<jwt>` accepts the same JWT used for REST. Sends `{type:"hello"}` on connect, broadcasts JSON events thereafter. Tenant-isolated (verified: a fresh tenant's socket does NOT receive demo-tenant events).
+- **WS broadcasts** wired into `jobs.create` (`job.created`), `jobs.update` (`job.updated`), `dispatch.set_priority` (`job.updated`), `dispatch.update_my_status` (`user.status`), `dispatch.update_my_location` (`user.location`).
+- **Tech status**: `POST /api/me/status` body `{status: available|on_route|on_site|break|off_duty}` persists + broadcasts.
+- **GPS**: `POST /api/me/location` body `{latitude:-90..90, longitude:-180..180, accuracy_m?}` persists `user.last_location` + broadcasts.
+- **Team locations dispatcher feed**: `GET /api/team/locations` — tenant-scoped, returns id/name/role/tech_status/last_location.
+- **Priority field**: `JobIn`/`JobUpdate` now accept `priority: low|normal|high|emergency`. New `PATCH /api/jobs/{id}/priority` for lightweight updates from the board.
+
+### Frontend
+- **`/app/dispatch` — the headline page**:
+  - **4 view tabs**: Day (hourly grid by tech), Week (day×tech matrix), Month (calendar with type-colored chips), Map (Leaflet + OSM with live tech markers).
+  - **Drag & drop** any job card (unassigned rail or board) onto a tech-time slot → optimistic PATCH + WS rebroadcast.
+  - **Color-coded job cards**: left-border tinted by `job_type`, status pill, $price.
+  - **Emergency cards** ring-pulse animated red with ⚡ icon; "1 Emergency" header chip + red "EMERGENCY OPEN" banner in the unassigned rail; one-click filter to show only emergencies.
+  - **Live WS indicator** (green pulse dot, "Live"/"Connecting…") with auto-reconnect.
+  - **Tech rail** with status badge + last GPS coord + per-tech "Optimize today" button (calls the v1.8 ZIP-based optimizer).
+  - **Map view**: Leaflet + free OpenStreetMap tiles, CircleMarker per tech colored by status, popups with name + time-ago.
+- **Tech-side TechStatusBar** on `/app/my-jobs`: 5 status pill toggles + GPS opt-in switch that pings `/me/location` every 60s only while a job is `in_progress`.
+- **AuthContext** now stores the JWT in `localStorage` (key `a1.token`) in addition to the httpOnly cookie, so the WS client can use it.
+- New libs: `leaflet`, `react-leaflet`.
+
+### Testing
+- **19 new tests + 222 baseline = 241/241 backend tests green**. 0 critical issues. 1 minor (WS close-code spec compliance — fixed).
+
 ## What's been implemented (Push expansion + UX polish — Feb 2026 — v1.11)
 - **New work order time fields**: The job modal now has both **Scheduled** start AND **Ends** datetime pickers alongside Duration and Price. Changing either time auto-recomputes duration; changing duration auto-extends the end picker. Form remains backwards-compatible — backend still stores `scheduled_at + duration_min` only.
 - **Push notifications for 3 additional events**:
@@ -188,16 +214,23 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - ✅ Work order start + end time fields in new-job modal
 - ✅ Native React Native scaffolding (`/app/mobile/` — Expo SDK 51, source-code only)
 
+### v1.12 — Done
+- ✅ Modern dispatch board (drag-and-drop, WebSocket realtime, day/week/month/map views, emergency priority + color-coded cards, tech GPS + status, Leaflet+OSM map)
+
 ### P1 — Remaining
 - Apple login (needs Apple Developer credentials from user)
 
 ### P2 — Future
+- Apple login (needs Apple Developer credentials)
 - Android login (needs Google Play Developer credentials)
-- Real geocoding for route optimization (Google Maps / Mapbox API)
+- Geocoding (Nominatim free or Mapbox) so customer addresses get pinned on the dispatch map automatically
 - SMS notifications (Twilio — needs credentials)
 - Booking-confirmation email back to customers
-- Mobile app push (Expo Notifications) — adapter from VAPID web push to FCM/APNs tokens
-- Mobile app: photo upload (`expo-image-picker`), signature capture, offline queue
+- Mobile app — wire Expo Notifications (FCM/APNs), camera photo upload, signature capture, offline queue
+- Tech leaderboard on dashboard (top-rated by 30d avg + tips)
+- 30-day recurring-revenue forecast widget
+- Per-user notification preferences (toggle per event class + quiet hours)
+- WS heartbeat / ping-pong for ultra-long sessions through aggressive ingress idle-kill
 
 ## Demo credentials
 Owner: `demo@a1fieldpro.com` / `Demo1234!`
