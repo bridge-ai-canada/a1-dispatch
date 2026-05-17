@@ -83,6 +83,27 @@ Testing: backend **77/77** pytest pass (14 new + 63 prior); frontend critical fl
 - **Brand component is auth-aware**: when a user is logged in and their company has a `branding.logo_path`, the layout/landing nav automatically renders the company logo instead of the A1 default — true white-label across the app for staff users.
 - **Database indexes** added on `jobs.customer_email` (portal scaling), `activity.(company_id, created_at)`, `sessions.user_id` for query performance at scale.
 
+## What's been implemented (Polish + Maintenance — Feb 2026 — v1.8)
+- **Invite verify-email gate**: `POST /api/users/invite` now 403s with friendly detail when the actor's `email_verified=False`. Demo owner remains verified.
+- **Recurring jobs / maintenance plans**:
+  - New `recurring_jobs` collection + 8 endpoints (list, create, patch, delete, force-run).
+  - Cadences: `weekly` (7d), `biweekly` (14d), `monthly` (30d), `quarterly` (90d), `annually` (365d), `custom` (`interval_days` required).
+  - Lazy materialization on `GET /api/recurring-jobs` AND `GET /api/jobs` — due plans auto-create real `jobs` with `source='recurring'` and `recurring_id` linkback.
+  - Activity events: `recurring.created`, `recurring.deleted`, `recurring.materialized`.
+  - Frontend: new `/app/recurring` page with table view, create form (6 cadence options + custom day input), pause/resume, force-run, delete.
+- **Analytics CSV exports**:
+  - `GET /api/exports/jobs.csv`, `customers.csv`, `payments.csv` with `?from=YYYY-MM-DD&to=YYYY-MM-DDT23:59:59` date filters.
+  - Owner/accountant/super_admin only (403 for everyone else).
+  - Frontend: new `/app/reports` page with date pickers + three download cards.
+- **Route optimization**:
+  - `POST /api/jobs/optimize-route` body `{technician_id, date, gap_min=30, dry_run=false}`.
+  - Heuristic: groups by ZIP (5-digit from end of address), then street-number ascending, then re-spaces `scheduled_at` from earliest current time, advancing by `duration + gap_min`.
+  - Owner/dispatcher/office_manager only.
+  - Activity: `route.optimized`.
+  - Frontend: "Optimize tech…" dropdown + "Optimize today" button in Schedule header.
+
+Testing: 146 baseline + 35 new = **181/181 backend tests green**, 0 critical issues.
+
 ## What's been implemented (Refactor + Polish — Feb 2026 — v1.7)
 - **Backend refactor**: `server.py` cut from ~1,400 → 175 lines. Routes now split across `/app/backend/routers/` modules: `auth.py`, `admin.py`, `companies.py`, `customers.py`, `jobs.py`, `payments.py`, `public_routes.py`, `portal.py`. Shared infra remains in `deps.py`. Mounted via single `APIRouter(prefix="/api")` in `server.py`. **120/120 tests still pass** (no behavior change).
 - **Industry icon palette** on `BookingWidget` when a company hasn't uploaded a logo: per-industry phosphor icon (Snowflake/Drop/Lightning/Garage/House/Plug/Wrench) on a rounded tile tinted with `branding.primary_color`. Contrast-aware foreground (white on dark, ink on light).
@@ -108,16 +129,22 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 ### P0 — Done in v1.7
 - ✅ `server.py` refactor split into routers/
 
-### P1 — Soon
+### P1 — Done in v1.8
+- ✅ Invite verify-email gate
+- ✅ Recurring jobs / maintenance plans
+- ✅ Analytics CSV exports
+- ✅ Route optimization (ZIP-based heuristic)
+
+### P1 — Remaining
 - Apple login (needs Apple Developer credentials from user)
-- Verify-email gate (already shipped v1.6) — extend to require verification when sending customer-facing communications (currently only payment checkout)
 
 ### P2 — Future
-- Route optimization
-- SMS notifications (Twilio)
-- Recurring jobs / maintenance plans
-- Reports / analytics export
-- Mobile native app (React Native)
+- Android login (needs Google Play Developer credentials)
+- React Native mobile app
+- Real geocoding for route optimization (Google Maps / Mapbox API)
+- SMS notifications (Twilio — needs credentials)
+- Booking-confirmation email back to customers
+- Recurring email delivery status surfacing (admin UI showing email log filter)
 
 ## Demo credentials
 Owner: `demo@a1fieldpro.com` / `Demo1234!`
