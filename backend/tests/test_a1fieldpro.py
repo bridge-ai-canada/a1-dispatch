@@ -195,7 +195,9 @@ def test_customers_create_list(owner_session):
     assert r.status_code == 200
     r = owner_session.get(f"{API}/customers", timeout=10)
     assert r.status_code == 200
-    assert any(c["name"] == "TEST_Cust" for c in r.json())
+    data = r.json()
+    rows = data.get("items", data) if isinstance(data, dict) else data
+    assert any(c["name"] == "TEST_Cust" for c in rows)
 
 
 # ---------- Multi-tenant isolation ----------

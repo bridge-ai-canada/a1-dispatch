@@ -123,19 +123,22 @@ class TestCustomers:
         # name
         r = owner.get(f"{API}/customers", params={"q": marker}, timeout=15)
         assert r.status_code == 200
-        names = [c["name"] for c in r.json()]
+        rows = r.json().get("items", []) if isinstance(r.json(), dict) else r.json()
+        names = [c["name"] for c in rows]
         assert any(marker in n for n in names)
         # email
         r = owner.get(f"{API}/customers", params={"q": f"se_{marker}"}, timeout=15)
         assert r.status_code == 200
-        assert any(c.get("email", "").startswith(f"se_{marker}") for c in r.json())
+        rows = r.json().get("items", []) if isinstance(r.json(), dict) else r.json()
+        assert any(c.get("email", "").startswith(f"se_{marker}") for c in rows)
 
     def test_filter_by_status(self, owner):
         owner.post(f"{API}/customers", json={"name": "TEST_StatLead", "status": "lead"}, timeout=15)
         owner.post(f"{API}/customers", json={"name": "TEST_StatActive", "status": "active"}, timeout=15)
         r = owner.get(f"{API}/customers", params={"status": "lead"}, timeout=15)
         assert r.status_code == 200
-        statuses = {c["status"] for c in r.json()}
+        rows = r.json().get("items", []) if isinstance(r.json(), dict) else r.json()
+        statuses = {c["status"] for c in rows}
         assert statuses == {"lead"} or statuses.issubset({"lead"})
 
     def test_filter_by_tag(self, owner):
@@ -143,7 +146,7 @@ class TestCustomers:
         owner.post(f"{API}/customers", json={"name": "TEST_TagA", "tags": [tag]}, timeout=15)
         r = owner.get(f"{API}/customers", params={"tag": tag}, timeout=15)
         assert r.status_code == 200
-        out = r.json()
+        out = r.json().get("items", []) if isinstance(r.json(), dict) else r.json()
         assert len(out) >= 1
         assert all(tag in c.get("tags", []) for c in out)
 
@@ -305,8 +308,8 @@ class TestAISummary:
         assert r.status_code == 200, r.text
         body = r.json()
         assert "summary" in body and "model" in body
-        # If EMERGENT_LLM_KEY is configured → claude-sonnet-4-5, else None
-        assert body["model"] in (None, "claude-sonnet-4-5")
+        # If EMERGENT_LLM_KEY is configured → claude-sonnet-4-5*, else None
+        assert body["model"] is None or body["model"].startswith("claude-sonnet-4-5")
         assert isinstance(body["summary"], str) and len(body["summary"]) > 0
 
 

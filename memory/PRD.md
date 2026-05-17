@@ -83,18 +83,24 @@ Testing: backend **77/77** pytest pass (14 new + 63 prior); frontend critical fl
 - **Brand component is auth-aware**: when a user is logged in and their company has a `branding.logo_path`, the layout/landing nav automatically renders the company logo instead of the A1 default — true white-label across the app for staff users.
 - **Database indexes** added on `jobs.customer_email` (portal scaling), `activity.(company_id, created_at)`, `sessions.user_id` for query performance at scale.
 
+## What's been implemented (Polish — Feb 2026 — v1.6)
+- **Job lifecycle activity events**: `jobs.created` (on POST /jobs) and `jobs.{scheduled|in_progress|completed|cancelled}` (on PATCH /jobs/{id}) now flow into the activity feed with `{title, status}` meta.
+- **payment.received activity event**: emitted by both the polling endpoint (`GET /payments/status/{session_id}`) and Stripe webhook when a transaction transitions to paid, with `{amount, currency, session_id}` meta.
+- **Verify-email gate before payment-link send**: `POST /api/payments/checkout` now returns 403 with a friendly "Verify your email before sending payment links…" detail when the staff user has `email_verified=False`. Demo seed users have `email_verified=True` so the existing flow continues to work.
+- **Booking widget returns full job**: `POST /api/public/companies/{company_id}/bookings` now responds `{ok, job_id, company_name, job:{…full document…}}` so the booking widget UI can show a confirmation card without a second round-trip.
+- **Hex color regex** on BrandingIn: `^#[0-9A-Fa-f]{6}$` enforced for `primary_color` / `accent_color` (Pydantic 422 on bad input).
+- **Password strength rules** on RegisterIn + ResetIn: min 8 chars, must include at least one letter and one number (Pydantic 422 on weak input).
+
+Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical issues. Stale `test_a1fieldpro` + `test_phase_crm` assertions updated for paginated customers and full claude model id.
+
 ## Backlog (prioritized)
 ### P0 — Phase 3 (next, dedicated)
 - **Refactor `server.py`** (~1,420 lines) → `deps.py` + `routers/{auth,admin,jobs,companies,public,portal,payments}.py`. Pure code reorganisation that risks breaking the 77 passing tests — should be a single-purpose round with 100% test re-run before merge.
 - Apple login (still needs Apple Developer account from user)
 
 ### P1 — Soon
-- Verify-email gate before payment-link send
 - Customer portal: rate the technician + tip after a completed visit
 - Industry icon palette (HVAC/Plumbing/Electrical) when the booking widget has no logo configured
-- Job activity events (`jobs.created`, `jobs.completed`, `payment.received`) into activity log
-- Booking endpoint returns full job object for consistency
-- Hex color regex validation, password strength rules
 - Resend email delivery status surfaced in activity log
 
 ### P2 — Future
