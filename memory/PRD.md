@@ -83,6 +83,17 @@ Testing: backend **77/77** pytest pass (14 new + 63 prior); frontend critical fl
 - **Brand component is auth-aware**: when a user is logged in and their company has a `branding.logo_path`, the layout/landing nav automatically renders the company logo instead of the A1 default — true white-label across the app for staff users.
 - **Database indexes** added on `jobs.customer_email` (portal scaling), `activity.(company_id, created_at)`, `sessions.user_id` for query performance at scale.
 
+## What's been implemented (Refactor + Polish — Feb 2026 — v1.7)
+- **Backend refactor**: `server.py` cut from ~1,400 → 175 lines. Routes now split across `/app/backend/routers/` modules: `auth.py`, `admin.py`, `companies.py`, `customers.py`, `jobs.py`, `payments.py`, `public_routes.py`, `portal.py`. Shared infra remains in `deps.py`. Mounted via single `APIRouter(prefix="/api")` in `server.py`. **120/120 tests still pass** (no behavior change).
+- **Industry icon palette** on `BookingWidget` when a company hasn't uploaded a logo: per-industry phosphor icon (Snowflake/Drop/Lightning/Garage/House/Plug/Wrench) on a rounded tile tinted with `branding.primary_color`. Contrast-aware foreground (white on dark, ink on light).
+- **Customer portal — rate technician + tip**:
+  - `POST /api/portal/jobs/{job_id}/rate` body `{rating:1-5, comment?}` → persists `rating`, `rating_comment`, `rated_at`, `rated_by` on the job; logs `rating.created` activity. Customer-only, completed-jobs only.
+  - `POST /api/portal/jobs/{job_id}/tip-checkout` body `{amount, origin_url}` → Stripe checkout URL with `metadata.type='tip'`; inserts `payment_transactions` doc with `type:'tip'`.
+  - `GET /api/portal/payments/status/{session_id}` → customer-side polling that credits `jobs.tip += amount` and emits `tip.received` on transition to paid.
+  - Stripe webhook also handles `type='tip'` transactions (increments `jobs.tip` instead of marking job paid; emits `tip.received`).
+  - Frontend `RateAndTip` component on every completed past visit: 5-star picker + optional comment + 4 tip presets ($5/$10/$20/$40) + custom amount. After Stripe redirect, portal polls `/portal/payments/status/{sid}` for up to 6 retries and toasts "Thanks for the tip!".
+- **Resend email delivery status in activity log**: `send_email()` accepts optional `actor` + `purpose`; logs `email.sent` activity with meta `{to, subject, purpose, status, email_id?, error?}`. Statuses: `sent`, `failed`, `skipped`, `no_id`. Hooked into auth.forgot, auth.verify_resend, admin.invite_user.
+
 ## What's been implemented (Polish — Feb 2026 — v1.6)
 - **Job lifecycle activity events**: `jobs.created` (on POST /jobs) and `jobs.{scheduled|in_progress|completed|cancelled}` (on PATCH /jobs/{id}) now flow into the activity feed with `{title, status}` meta.
 - **payment.received activity event**: emitted by both the polling endpoint (`GET /payments/status/{session_id}`) and Stripe webhook when a transaction transitions to paid, with `{amount, currency, session_id}` meta.
@@ -94,14 +105,12 @@ Testing: backend **77/77** pytest pass (14 new + 63 prior); frontend critical fl
 Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical issues. Stale `test_a1fieldpro` + `test_phase_crm` assertions updated for paginated customers and full claude model id.
 
 ## Backlog (prioritized)
-### P0 — Phase 3 (next, dedicated)
-- **Refactor `server.py`** (~1,420 lines) → `deps.py` + `routers/{auth,admin,jobs,companies,public,portal,payments}.py`. Pure code reorganisation that risks breaking the 77 passing tests — should be a single-purpose round with 100% test re-run before merge.
-- Apple login (still needs Apple Developer account from user)
+### P0 — Done in v1.7
+- ✅ `server.py` refactor split into routers/
 
 ### P1 — Soon
-- Customer portal: rate the technician + tip after a completed visit
-- Industry icon palette (HVAC/Plumbing/Electrical) when the booking widget has no logo configured
-- Resend email delivery status surfaced in activity log
+- Apple login (needs Apple Developer credentials from user)
+- Verify-email gate (already shipped v1.6) — extend to require verification when sending customer-facing communications (currently only payment checkout)
 
 ### P2 — Future
 - Route optimization
