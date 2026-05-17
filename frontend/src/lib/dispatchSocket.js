@@ -36,6 +36,10 @@ export function useDispatchSocket(onEvent) {
             ws.onmessage = (e) => {
                 try {
                     const msg = JSON.parse(e.data);
+                    if (msg.type === "ping") {
+                        try { ws.send(JSON.stringify({ type: "pong" })); } catch (_) {}
+                        return;
+                    }
                     onEventRef.current?.(msg);
                 } catch (_) {}
             };

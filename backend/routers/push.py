@@ -6,7 +6,6 @@ from pydantic import BaseModel
 
 from deps import db, now_iso, VAPID_PUBLIC_KEY, get_current_user
 from push_service import send_push_to_user
-
 router = APIRouter()
 
 
@@ -25,6 +24,44 @@ class PushTestIn(BaseModel):
     user_id: Optional[str] = None  # default: self
     title: Optional[str] = "A1 Field Pro"
     body: Optional[str] = "Test push from dispatch"
+    tag: Optional[str] = "a1-test"  # e.g. "job-123", "pay-x", "tip-x", "rate-x", "low-rate-x"
+
+
+class ExpoTokenIn(BaseModel):
+    token: str
+    device: Optional[str] = ""  # iOS / Android / model name
+    app_version: Optional[str] = ""
+
+
+@router.post("/push/expo-token")
+async def push_register_expo(body: ExpoTokenIn, user: dict = Depends(get_current_user)):
+    """Register an Expo Push token from the React Native mobile app."""
+    if not body.token.startswith("ExponentPushToken[") and not body.token.startswith("ExpoPushToken["):
+        raise HTTPException(status_code=400, detail="Invalid Expo push token format")
+    existing = await db.expo_push_tokens.find_one({"token": body.token}, {"_id": 0})
+    if existing:
+        await db.expo_push_tokens.update_one(
+            {"token": body.token},
+            {"$set": {"user_id": user["id"], "company_id": user.get("company_id"),
+                      "active": True, "device": body.device,
+                      "app_version": body.app_version, "updated_at": now_iso()}},
+        )
+        return {"ok": True, "id": existing["id"]}
+    tid = str(uuid.uuid4())
+    await db.expo_push_tokens.insert_one({
+        "id": tid, "user_id": user["id"], "company_id": user.get("company_id"),
+        "token": body.token, "device": body.device, "app_version": body.app_version,
+        "active": True, "created_at": now_iso(),
+    })
+    return {"ok": True, "id": tid}
+
+
+@router.delete("/push/expo-token")
+async def push_unregister_expo(token: str, user: dict = Depends(get_current_user)):
+    res = await db.expo_push_tokens.delete_one(
+        {"token": token, "user_id": user["id"]}
+    )
+    return {"ok": True, "removed": res.deleted_count}
 
 
 @router.get("/push/public-key")
@@ -90,6 +127,6 @@ async def push_test(body: PushTestIn, user: dict = Depends(get_current_user)):
         "title": body.title or "A1 Field Pro",
         "body": body.body or "Test push from dispatch",
         "url": "/app/my-jobs",
-        "tag": "a1-test",
+        "tag": body.tag or "a1-test",
     })
     return {"ok": True, **result}

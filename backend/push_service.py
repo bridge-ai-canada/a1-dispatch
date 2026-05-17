@@ -42,7 +42,7 @@ async def send_push_to_user(user_id: str, payload: dict) -> dict:
     """Send a push to every active subscription for `user_id`.
     Honors per-user push_prefs (skipped event classes + quiet hours).
     Removes subscriptions that return 404/410 (gone)."""
-    if not user_id or not VAPID_PRIVATE_KEY:
+    if not user_id:
         return {"sent": 0, "removed": 0, "skipped": False}
 
     # Check user prefs based on the push `tag` prefix
@@ -71,11 +71,12 @@ async def send_push_to_user(user_id: str, payload: dict) -> dict:
         if in_quiet:
             return {"sent": 0, "removed": 0, "skipped": True}
 
-    subs = await db.push_subscriptions.find(
-        {"user_id": user_id, "active": {"$ne": False}}, {"_id": 0}
-    ).to_list(20)
-    if not subs:
-        return {"sent": 0, "removed": 0, "skipped": False}
+    # Web Push fanout (skipped if VAPID not configured)
+    subs = []
+    if VAPID_PRIVATE_KEY:
+        subs = await db.push_subscriptions.find(
+            {"user_id": user_id, "active": {"$ne": False}}, {"_id": 0}
+        ).to_list(20)
 
     sent = 0
     removed = 0
@@ -86,4 +87,14 @@ async def send_push_to_user(user_id: str, payload: dict) -> dict:
         elif status in (404, 410):
             await db.push_subscriptions.delete_one({"id": sub["id"]})
             removed += 1
+
+    # Fan out to Expo push tokens (mobile app) — never block on failure
+    try:
+        from expo_push_service import send_expo_to_user
+        expo = await send_expo_to_user(user_id, payload)
+        sent += expo.get("sent", 0)
+        removed += expo.get("removed", 0)
+    except Exception as e:
+        logger.warning(f"expo fanout failed: {e}")
+
     return {"sent": sent, "removed": removed, "skipped": False}

@@ -1,4 +1,5 @@
 """Public booking widget + tenant-scoped file proxy."""
+import asyncio
 import uuid
 from typing import Optional
 import jwt
@@ -7,7 +8,7 @@ from pydantic import BaseModel
 
 from deps import (
     db, now_iso, APP_NAME, JWT_SECRET, JWT_ALGORITHM,
-    get_object,
+    get_object, send_email, email_layout, FRONTEND_URL,
 )
 
 router = APIRouter()
@@ -66,6 +67,49 @@ async def public_booking(company_id: str, body: BookingIn):
         "created_at": now_iso(),
     }
     await db.jobs.insert_one(dict(job))
+
+    # Send confirmation emails: one to the customer, one to the company owner.
+    pretty_when = "Soon — we'll call to confirm a time"
+    if body.preferred_date:
+        try:
+            from datetime import datetime as _dt
+            pretty_when = _dt.fromisoformat(body.preferred_date).strftime("%A, %b %d at %I:%M %p")
+        except Exception:
+            pretty_when = body.preferred_date
+
+    customer_html = email_layout(
+        f"Thanks for booking with {company['name']}",
+        f"<p>Hi {body.name}, we've received your <strong>{body.job_type}</strong> request.</p>"
+        f"<p><strong>When:</strong> {pretty_when}<br/>"
+        f"<strong>Where:</strong> {body.address}<br/>"
+        f"<strong>What:</strong> {body.description or 'On-site assessment'}</p>"
+        f"<p>A dispatcher will reach out shortly to confirm. Reply to this email if you need to change anything.</p>",
+        "Track this request", f"{FRONTEND_URL}/portal",
+    )
+
+    owner_html = email_layout(
+        f"New booking — {body.name}",
+        f"<p><strong>{body.name}</strong> ({body.phone}) just requested a <strong>{body.job_type}</strong> visit.</p>"
+        f"<p><strong>Address:</strong> {body.address}<br/>"
+        f"<strong>Preferred time:</strong> {pretty_when}<br/>"
+        f"<strong>Notes:</strong> {body.description or '—'}</p>",
+        "Open dispatch board", f"{FRONTEND_URL}/app/dispatch",
+    )
+
+    async def _send_async():
+        if body.email:
+            await send_email(body.email, f"Your booking with {company['name']}",
+                             customer_html, purpose="booking.customer_confirmation")
+        owner = await db.users.find_one({"id": company.get("owner_id")}, {"email": 1, "_id": 0})
+        if owner and owner.get("email"):
+            await send_email(owner["email"], f"New booking — {body.name}", owner_html,
+                             purpose="booking.owner_alert")
+
+    try:
+        asyncio.create_task(_send_async())
+    except RuntimeError:
+        pass
+
     return {"ok": True, "job_id": job["id"], "company_name": company["name"], "job": job}
 
 
