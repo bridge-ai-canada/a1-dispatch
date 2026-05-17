@@ -104,6 +104,24 @@ Testing: backend **77/77** pytest pass (14 new + 63 prior); frontend critical fl
 
 Testing: 146 baseline + 35 new = **181/181 backend tests green**, 0 critical issues.
 
+## What's been implemented (Web-Push pipeline — Feb 2026 — v1.10)
+- **VAPID keys** auto-generated and persisted to `backend/.env` (`VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT`).
+- **Backend push service** (`push_service.py`): `send_push_to_user(user_id, payload)` sends to every active subscription for the user via `pywebpush`. Subscriptions that return 404/410 are automatically removed.
+- **Push router** (`/api/push/*`):
+  - `GET /push/public-key` — public, returns the VAPID public key for the frontend `applicationServerKey`.
+  - `POST /push/subscribe` — upsert a subscription by endpoint. Updates keys + user_id on re-subscribe.
+  - `DELETE /push/subscribe?endpoint=…` — remove the actor's subscription.
+  - `GET /push/subscriptions/me` — list (without raw keys) for diagnostics.
+  - `POST /push/test` — fire a test notification. Cross-tenant + cross-role guarded.
+- **Send-on-event hooks**:
+  - `POST /api/jobs` with `assigned_to ≠ self` → push to assigned tech: "New job assigned" + scheduled time + tap-through URL.
+  - `PATCH /api/jobs/{id}` with a new `assigned_to` → "New job assigned" push; with a `scheduled_at` change → "Job rescheduled" push to current tech.
+  - All push sends wrapped in try/except so job CRUD never breaks if push delivery fails.
+- **Frontend opt-in**: `PushOptIn` component on `/app/my-jobs` with 3-state UI (default/granted/denied), enable/disable buttons, and a "Test" button that calls `/api/push/test`. `push.js` helper handles `Notification.requestPermission` + `PushManager.subscribe` + base64url ↔ Uint8Array conversion.
+- **Service worker** (`sw.js`) already handles `push` + `notificationclick` events from v1.9.
+
+Testing: 181 baseline + 26 new = **207/207 backend tests green**, 0 critical issues.
+
 ## What's been implemented (PWA — Feb 2026 — v1.9)
 - **Progressive Web App**: A1 Field Pro is now installable on iOS & Android home screens.
   - `/public/manifest.json` — standalone display, brand colors, A1 logo as icon (192/512), shortcuts to Today's Jobs + Schedule.
@@ -150,16 +168,19 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 ### v1.9 — Done
 - ✅ PWA (installable, offline-capable, push-ready)
 
+### v1.10 — Done
+- ✅ Backend Web-Push trigger pipeline (VAPID, subscription endpoint, send-on-event hooks)
+
 ### P1 — Remaining
 - Apple login (needs Apple Developer credentials from user)
 
 ### P2 — Future
 - Android login (needs Google Play Developer credentials)
-- Backend Web-Push trigger pipeline (subscription endpoint + VAPID keys + send-on-event hooks)
 - Real geocoding for route optimization (Google Maps / Mapbox API)
 - SMS notifications (Twilio — needs credentials)
 - Booking-confirmation email back to customers
 - Native React Native app (separate codebase, requires local Xcode/Expo build environment)
+- Push for other events: payment received, customer rated job, recurring job materialized
 
 ## Demo credentials
 Owner: `demo@a1fieldpro.com` / `Demo1234!`

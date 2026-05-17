@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
-from deps import db, now_iso, VAPID_PUBLIC_KEY, get_current_user, require_role
+from deps import db, now_iso, VAPID_PUBLIC_KEY, get_current_user
 from push_service import send_push_to_user
 
 router = APIRouter()
@@ -41,6 +41,7 @@ async def push_subscribe(body: PushSubscribeIn, user: dict = Depends(get_current
         await db.push_subscriptions.update_one(
             {"endpoint": body.endpoint},
             {"$set": {"user_id": user["id"], "active": True,
+                      "keys": body.keys.model_dump(),
                       "user_agent": body.user_agent, "updated_at": now_iso()}},
         )
         return {"ok": True, "id": existing["id"]}
