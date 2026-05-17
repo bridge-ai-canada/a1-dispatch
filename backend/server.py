@@ -12,7 +12,7 @@ from deps import (
     init_storage,
     hash_password, verify_password,
 )
-from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal
+from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt
 
 app = FastAPI(title="A1 Field Pro API")
 api = APIRouter(prefix="/api")
@@ -25,6 +25,9 @@ api.include_router(jobs.router)
 api.include_router(payments.router)
 api.include_router(public_routes.router)
 api.include_router(portal.router)
+api.include_router(recurring.router)
+api.include_router(exports.router)
+api.include_router(routes_opt.router)
 
 
 @api.get("/")
@@ -48,6 +51,7 @@ async def startup():
     await db.equipment.create_index([("company_id", 1), ("customer_id", 1)])
     await db.communications.create_index([("company_id", 1), ("customer_id", 1), ("created_at", -1)])
     await db.customer_files.create_index([("company_id", 1), ("customer_id", 1)])
+    await db.recurring_jobs.create_index([("company_id", 1), ("active", 1), ("next_run_at", 1)])
     await seed_demo()
 
 

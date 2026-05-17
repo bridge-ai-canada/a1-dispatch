@@ -412,6 +412,47 @@ class JobUpdate(BaseModel):
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
 
+_CADENCE_DAYS = {
+    "weekly": 7,
+    "biweekly": 14,
+    "monthly": 30,
+    "quarterly": 90,
+    "annually": 365,
+}
+
+class RecurringJobIn(BaseModel):
+    title: str
+    description: Optional[str] = ""
+    customer_id: Optional[str] = None
+    customer_name: Optional[str] = ""
+    customer_phone: Optional[str] = ""
+    customer_email: Optional[str] = ""
+    address: Optional[str] = ""
+    job_type: str = "HVAC"
+    assigned_to: Optional[str] = None
+    duration_min: int = 60
+    price: float = 0.0
+    cadence: Literal["weekly", "biweekly", "monthly", "quarterly", "annually", "custom"] = "monthly"
+    interval_days: Optional[int] = None  # used only when cadence == "custom"
+    start_at: Optional[str] = None  # ISO; default = now
+    active: bool = True
+
+class RecurringJobUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    customer_id: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    address: Optional[str] = None
+    job_type: Optional[str] = None
+    assigned_to: Optional[str] = None
+    duration_min: Optional[int] = None
+    price: Optional[float] = None
+    cadence: Optional[Literal["weekly", "biweekly", "monthly", "quarterly", "annually", "custom"]] = None
+    interval_days: Optional[int] = None
+    active: Optional[bool] = None
+
 class GoogleExchangeIn(BaseModel):
     session_id: str
 

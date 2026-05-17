@@ -68,6 +68,9 @@ async def update_user(user_id: str, body: UserUpdateIn, actor: dict = Depends(ge
 
 @router.post("/users/invite")
 async def invite_user(body: InviteIn, actor: dict = Depends(get_current_user)):
+    if not actor.get("email_verified"):
+        raise HTTPException(status_code=403,
+            detail="Verify your email before inviting teammates. Check inbox or resend verification from your profile.")
     allowed = INVITE_ALLOWED.get(actor["role"], set())
     if body.role not in allowed:
         raise HTTPException(status_code=403, detail=f"Cannot invite role '{body.role}'")

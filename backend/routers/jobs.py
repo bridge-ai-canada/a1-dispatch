@@ -30,6 +30,12 @@ async def list_jobs(
     assigned_to: Optional[str] = None,
     mine: bool = False,
 ):
+    # Lazily materialize any due recurring jobs so the list always reflects them
+    try:
+        from routers.recurring import _materialize_due
+        await _materialize_due(user["company_id"])
+    except Exception:
+        pass
     q = {"company_id": user["company_id"]}
     if status:
         q["status"] = status

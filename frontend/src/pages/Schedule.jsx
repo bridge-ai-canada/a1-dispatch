@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import api from "../lib/api";
 import { toast } from "sonner";
-import { CaretLeft, CaretRight } from "@phosphor-icons/react";
+import { CaretLeft, CaretRight, MapTrifold } from "@phosphor-icons/react";
 
 const HOURS = Array.from({ length: 11 }, (_, i) => 7 + i);
 
@@ -72,6 +72,22 @@ export default function Schedule() {
 
     const allowDrop = (key) => (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOver(key); };
 
+    const [optTech, setOptTech] = useState("");
+    const optimize = async () => {
+        if (!optTech) return toast.error("Pick a technician first");
+        const today = new Date().toISOString().slice(0, 10);
+        try {
+            const { data } = await api.post("/jobs/optimize-route", {
+                technician_id: optTech, date: today, gap_min: 30, dry_run: false,
+            });
+            if (data.reordered === 0) toast.info("No jobs to optimize for today");
+            else toast.success(`Optimized ${data.reordered} stops for today`);
+            load();
+        } catch (err) {
+            toast.error(err.response?.data?.detail || "Optimize failed");
+        }
+    };
+
     return (
         <div data-testid="schedule-page" className="space-y-6">
             <div className="flex items-end justify-between flex-wrap gap-4">
@@ -80,7 +96,21 @@ export default function Schedule() {
                     <h1 className="font-display text-4xl font-extrabold tracking-tighter mt-1">Schedule</h1>
                     <p className="text-sm text-slate-500 mt-2">Drag jobs onto a time slot to reschedule.</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1 border border-slate-300 bg-white">
+                        <select value={optTech} onChange={(e) => setOptTech(e.target.value)}
+                            data-testid="optimize-tech-select"
+                            className="h-9 pl-3 pr-2 text-sm bg-transparent focus:outline-none">
+                            <option value="">Optimize tech…</option>
+                            {techs.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                        <button onClick={optimize} disabled={!optTech}
+                            data-testid="optimize-route-button"
+                            title="Reorder this technician's jobs today by ZIP proximity"
+                            className="h-9 px-3 border-l border-slate-300 hover:bg-slate-50 text-sm font-medium flex items-center gap-1.5 disabled:opacity-50">
+                            <MapTrifold size={14} /> Optimize today
+                        </button>
+                    </div>
                     <button onClick={() => shift(-1)} data-testid="prev-week-button" className="h-9 w-9 border border-slate-300 hover:bg-slate-50 flex items-center justify-center"><CaretLeft /></button>
                     <button onClick={() => setAnchor(startOfWeek(new Date()))} className="h-9 px-3 border border-slate-300 hover:bg-slate-50 text-sm font-medium">Today</button>
                     <button onClick={() => shift(1)} data-testid="next-week-button" className="h-9 w-9 border border-slate-300 hover:bg-slate-50 flex items-center justify-center"><CaretRight /></button>
