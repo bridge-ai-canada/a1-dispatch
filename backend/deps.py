@@ -17,7 +17,7 @@ from typing import Optional, List, Literal
 
 from fastapi import HTTPException, Request, Response, Depends
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from roles import has_perm
 
@@ -257,6 +257,17 @@ class RegisterIn(BaseModel):
     email: EmailStr
     password: str
 
+    @field_validator("password")
+    @classmethod
+    def _strong_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if not any(c.isalpha() for c in v):
+            raise ValueError("Password must contain at least one letter")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one number")
+        return v
+
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
@@ -268,6 +279,17 @@ class ForgotIn(BaseModel):
 class ResetIn(BaseModel):
     token: str
     new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def _strong_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if not any(c.isalpha() for c in v):
+            raise ValueError("Password must contain at least one letter")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one number")
+        return v
 
 class InviteIn(BaseModel):
     name: str
@@ -335,9 +357,11 @@ class CommunicationIn(BaseModel):
     summary: str
     body: Optional[str] = ""
 
+_HEX_COLOR_RE = r"^#[0-9A-Fa-f]{6}$"
+
 class BrandingIn(BaseModel):
-    primary_color: Optional[str] = None
-    accent_color: Optional[str] = None
+    primary_color: Optional[str] = Field(default=None, pattern=_HEX_COLOR_RE)
+    accent_color: Optional[str] = Field(default=None, pattern=_HEX_COLOR_RE)
     logo_path: Optional[str] = None
 
 class JobIn(BaseModel):

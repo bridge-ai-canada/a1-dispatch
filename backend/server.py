@@ -745,6 +745,8 @@ async def create_job(body: JobIn, user: dict = Depends(get_current_user)):
     }
     await db.jobs.insert_one(doc)
     doc.pop("_id", None)
+    await log_activity(user, "jobs.created", "job", doc["id"],
+                       {"title": doc["title"], "status": doc["status"]})
     if doc.get("customer_id"):
         await db.communications.insert_one({
             "id": str(uuid.uuid4()), "company_id": user["company_id"],
@@ -780,8 +782,12 @@ async def update_job(job_id: str, body: JobUpdate, user: dict = Depends(get_curr
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Job not found")
     job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
-    if updates.get("status") in ("scheduled", "in_progress", "completed", "cancelled") and job.get("customer_id"):
-        verb = {"scheduled": "scheduled", "in_progress": "started", "completed": "completed", "cancelled": "cancelled"}[updates["status"]]
+    new_status = updates.get("status")
+    if new_status in ("scheduled", "in_progress", "completed", "cancelled"):
+        await log_activity(user, f"jobs.{new_status}", "job", job_id,
+                           {"title": job.get("title")})
+    if new_status in ("scheduled", "in_progress", "completed", "cancelled") and job.get("customer_id"):
+        verb = {"scheduled": "scheduled", "in_progress": "started", "completed": "completed", "cancelled": "cancelled"}[new_status]
         await db.communications.insert_one({
             "id": str(uuid.uuid4()), "company_id": user["company_id"],
             "customer_id": job["customer_id"], "actor_id": user["id"], "actor_name": user["name"],
@@ -850,6 +856,9 @@ async def dashboard_stats(user: dict = Depends(get_current_user)):
 # -------------------- Payments (Stripe) --------------------
 @api.post("/payments/checkout")
 async def create_checkout(body: CheckoutIn, request: Request, user: dict = Depends(get_current_user)):
+    if not user.get("email_verified"):
+        raise HTTPException(status_code=403,
+            detail="Verify your email before sending payment links. Check inbox or resend verification from your profile.")
     job = await db.jobs.find_one({"id": body.job_id, "company_id": user["company_id"]}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -920,6 +929,8 @@ async def payment_status(session_id: str, request: Request, user: dict = Depends
         await db.payment_transactions.update_one(
             {"session_id": session_id}, {"$set": {"processed": True}}
         )
+        await log_activity(user, "payment.received", "job", tx["job_id"],
+                           {"amount": tx.get("amount"), "currency": tx.get("currency", "usd")})
     tx = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
     return tx
 
@@ -950,6 +961,18 @@ async def stripe_webhook(request: Request):
                 await db.payment_transactions.update_one(
                     {"session_id": evt.session_id}, {"$set": {"processed": True}}
                 )
+                await db.activity.insert_one({
+                    "id": str(uuid.uuid4()),
+                    "company_id": tx.get("company_id"),
+                    "actor_id": "stripe_webhook",
+                    "actor_name": "Stripe",
+                    "actor_role": "system",
+                    "action": "payment.received",
+                    "target_type": "job",
+                    "target_id": tx["job_id"],
+                    "meta": {"amount": tx.get("amount"), "currency": tx.get("currency", "usd"), "session_id": evt.session_id},
+                    "created_at": now_iso(),
+                })
     return {"received": True}
 
 # -------------------- Files / Photos / Signatures --------------------
@@ -1118,7 +1141,7 @@ async def public_booking(company_id: str, body: BookingIn):
         "created_at": now_iso(),
     }
     await db.jobs.insert_one(dict(job))
-    return {"ok": True, "job_id": job["id"], "company_name": company["name"]}
+    return {"ok": True, "job_id": job["id"], "company_name": company["name"], "job": job}
 
 @api.get("/jobs/{job_id}/invoice.pdf")
 async def invoice_pdf(job_id: str, user: dict = Depends(get_current_user)):

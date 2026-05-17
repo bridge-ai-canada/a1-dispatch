@@ -1,0 +1,49 @@
+{
+  "summary": "Iteration-8 regression + new-behavior backend testing for the 4 P1 polish items. Built /app/backend/tests/test_iteration_8.py with 26 targeted cases covering: (1) password strength on /api/auth/register & /api/auth/reset (short/no-letter/no-digit -> 422, valid -> 200), (2) BrandingIn hex pattern on PATCH /api/companies/me ('red'/'#abc'/'#GGGGGG' -> 422, '#1D4ED8' -> 200), (3) checkout email_verified gate (fresh unverified user -> 403 with 'Verify your email...' detail; verified demo owner -> 200 with Stripe URL+session_id), (4) activity events jobs.created and jobs.<scheduled|in_progress|completed|cancelled> with proper meta {title,(status)}, (5) public_booking now returns full job object containing status/source/customer_email/id. Plus regression smoke (login, /auth/me, list jobs, paginated customers, dashboard stats, activity feed, sessions, users, invoice PDF). ALL 26 NEW TESTS PASS. Full pytest suite: 115 passed / 5 failed — the 5 failures are pre-existing stale tests already documented in iteration_7 (customers endpoint paginated + claude full versioned model id). Tester also fixed 1 stale assertion in test_phase2b.py::test_reset_invalid_token which was using new_password='abcdef' that now correctly triggers the new 422 password validator before reaching the invalid-token branch.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/customers", "issue": "Stale tests test_a1fieldpro.py::test_customers_create_list and test_phase_crm.py::TestCustomers (test_search_q_matches_name_phone_email_address, test_filter_by_status, test_filter_by_tag) still consume bare-list shape; endpoint correctly returns paginated {items,total,has_more,limit,skip}. Pre-existing from iteration_7."},
+      {"endpoint": "GET /api/customers/{id}/summary", "issue": "test_phase_crm.py::TestAISummary::test_summary_returns_model_or_fallback expects model in (None,'claude-sonnet-4-5') but endpoint returns full id 'claude-sonnet-4-5-20250929'. Pre-existing from iteration_7."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_8.py",
+    "/app/test_reports/pytest/iteration_8_results.xml",
+    "/app/test_reports/pytest/iteration_8_full.xml"
+  ],
+  "action_items": [
+    "Update the 4 stale customers tests to consume paginated payload: data = r.json(); rows = data['items'] (test_a1fieldpro.py::test_customers_create_list and the 3 filter tests in test_phase_crm.py::TestCustomers).",
+    "Update test_phase_crm.py::TestAISummary::test_summary_returns_model_or_fallback to assert model is None or model.startswith('claude-sonnet-4-5').",
+    "Optional: tighten the password-validator error messages — currently surfaced only via Pydantic 422 'detail' array. Consider a clearer top-level 'message' field for the frontend toast.",
+    "Optional: add server-side rate limiting / lockout to /api/auth/register since fresh-user creation is now used by the email_verified-gate path and could be abused."
+  ],
+  "critical_code_review_comments": [
+    "Password strength validator is correctly defined on BOTH RegisterIn and ResetIn (deps.py:260-292). Length/letter/digit checks are minimal but sufficient per spec.",
+    "BrandingIn uses Pydantic Field(pattern=_HEX_COLOR_RE) — Pydantic-v2 correctly returns 422 for non-matching values. Pattern '^#[0-9A-Fa-f]{6}$' is strict 6-digit (no 3-digit shorthand) which matches the request.",
+    "Checkout email_verified gate is the very first check in create_checkout (server.py:859-861) — correct ordering (cheap check before DB lookup / Stripe call). Error message text matches the spec exactly.",
+    "log_activity is fire-and-forget after the response object is built, but it is awaited inline — slight latency cost on hot create/update paths. Acceptable for current scale; consider BackgroundTasks if write throughput grows.",
+    "public_booking response now leaks the full job document including internal fields (company_id, paid, created_at). For a PUBLIC endpoint this is acceptable here (no user PII beyond what the submitter just typed) but worth a one-line whitelist if multi-tenant exposure becomes a concern.",
+    "Stripe webhook activity log (server.py:964-975) constructs the activity doc inline instead of calling log_activity() — slight code duplication; consider refactoring to a system_actor helper.",
+    "server.py is 1,384 lines — still above the 700-line guideline. Router split (routers/auth.py, routers/jobs.py, routers/payments.py) remains a recommended Phase-2 task but is intentionally deferred per user choice (b)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration_8.py (NEW — 26 cases)",
+    "/app/backend/tests/test_phase2b.py (fixed test_reset_invalid_token to use strong pw so it tests the invalid-token branch, not the new pw validator)",
+    "/app/test_reports/pytest/iteration_8_results.xml (NEW)",
+    "/app/test_reports/pytest/iteration_8_full.xml (NEW)",
+    "/app/test_reports/iteration_8.json"
+  ],
+  "success_rate": {"backend": "95.8% (115/120 — 5 pre-existing stale-test failures, 0 regressions from the 4 P1 polish items; 26/26 NEW tests pass)", "frontend": "not tested (backend-only iteration)"},
+  "test_credentials": "demo@a1fieldpro.com / Demo1234! (owner, email_verified=True, MFA off). superadmin@a1fieldpro.com / Super1234!. Fresh TEST_unv_* users registered during the run are email_verified=False — leftover in DB but harmless (TEST_ prefix).",
+  "seed_data_creation": "Per-test fresh users TEST_pw_*@example.com, TEST_unv_*@example.com (one each per uuid), plus several TEST_ACT_*/TEST_INV_pdf/TEST_BK_* jobs and customers on the demo company. All prefixed TEST_ for easy bulk cleanup via `db.{users,companies,jobs,customers,activity}.delete_many({name:/^TEST_/})`.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All 4 P1 polish items are implemented correctly and covered by /app/backend/tests/test_iteration_8.py (26 cases, 100% pass). Full pytest suite is 115/120; the 5 outstanding failures are STALE tests (paginated customers + full claude model id) carried over from iteration_7 — fix the assertions, not the endpoints. New tester should: (1) update the 4 customers tests to read .json()['items'], (2) update the AI-summary model assertion to accept the full versioned id, (3) optionally retest the Stripe webhook payment.received activity by hitting /api/webhook/stripe with a forged event (currently un-asserted but code path verified by inspection). Backend deps.py & server.py are stable, no service restarts were needed during the run.",
+  "rca of the issue": "test_phase2b::test_reset_invalid_token failure RCA: the new ResetIn._strong_password Pydantic validator runs BEFORE the token-lookup logic in /api/auth/reset. The old test sent new_password='abcdef' (6 chars, no digit) which now legitimately returns 422 'Password must be at least 8 characters'. The test was intended to exercise the 400 'invalid token' branch, not the validator. Fix applied: changed new_password to 'Abcdef12' so the request passes validation and reaches the token-decode branch as originally intended; assertion of 400 now succeeds. No production code change required."
+}

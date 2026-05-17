@@ -156,7 +156,7 @@ class TestPasswordReset:
         assert r2.status_code == 401
 
     def test_reset_invalid_token(self):
-        r = requests.post(f"{API}/auth/reset", json={"token": "not.a.jwt", "new_password": "abcdef"}, timeout=10)
+        r = requests.post(f"{API}/auth/reset", json={"token": "not.a.jwt", "new_password": "Abcdef12"}, timeout=10)
         assert r.status_code == 400
 
 
