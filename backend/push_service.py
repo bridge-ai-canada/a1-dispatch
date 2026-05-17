@@ -40,14 +40,42 @@ def _send_one(subscription: dict, payload: dict) -> tuple[bool, int]:
 
 async def send_push_to_user(user_id: str, payload: dict) -> dict:
     """Send a push to every active subscription for `user_id`.
+    Honors per-user push_prefs (skipped event classes + quiet hours).
     Removes subscriptions that return 404/410 (gone)."""
     if not user_id or not VAPID_PRIVATE_KEY:
-        return {"sent": 0, "removed": 0}
+        return {"sent": 0, "removed": 0, "skipped": False}
+
+    # Check user prefs based on the push `tag` prefix
+    user = await db.users.find_one({"id": user_id}, {"push_prefs": 1, "_id": 0})
+    prefs = (user or {}).get("push_prefs") or {}
+    tag = payload.get("tag", "")
+    tag_prefix = tag.split("-")[0] if tag else ""
+    pref_keys = {
+        "job": "job_assigned",        # 'job-<id>' = new/reassigned
+        "pay": "payment_received",
+        "tip": "tip_received",
+        "rate": "rating_created",
+        "low": "rating_low_alert",    # 'low-rate-<id>'
+    }
+    pref_key = pref_keys.get(tag_prefix)
+    if pref_key and prefs.get(pref_key) is False:
+        return {"sent": 0, "removed": 0, "skipped": True}
+
+    # Quiet hours (UTC hour for simplicity; refine to user timezone later)
+    qs = prefs.get("quiet_hours_start")
+    qe = prefs.get("quiet_hours_end")
+    if isinstance(qs, int) and isinstance(qe, int):
+        from datetime import datetime, timezone as _tz
+        now_h = datetime.now(_tz.utc).hour
+        in_quiet = (qs <= now_h < qe) if qs <= qe else (now_h >= qs or now_h < qe)
+        if in_quiet:
+            return {"sent": 0, "removed": 0, "skipped": True}
+
     subs = await db.push_subscriptions.find(
         {"user_id": user_id, "active": {"$ne": False}}, {"_id": 0}
     ).to_list(20)
     if not subs:
-        return {"sent": 0, "removed": 0}
+        return {"sent": 0, "removed": 0, "skipped": False}
 
     sent = 0
     removed = 0
@@ -58,4 +86,4 @@ async def send_push_to_user(user_id: str, payload: dict) -> dict:
         elif status in (404, 410):
             await db.push_subscriptions.delete_one({"id": sub["id"]})
             removed += 1
-    return {"sent": sent, "removed": removed}
+    return {"sent": sent, "removed": removed, "skipped": False}

@@ -31,9 +31,17 @@ async def ws_endpoint(websocket: WebSocket, token: str = Query(...)):
     try:
         # Send a hello so clients can confirm connection
         await websocket.send_json({"type": "hello", "data": {"user_id": user_id, "company_id": company_id}})
+        # Heartbeat loop: server pings every 25s; if recv() times out we send ping
+        import asyncio
         while True:
-            # We don't need client→server messages for now, but keep the loop to detect disconnect.
-            await websocket.receive_text()
+            try:
+                msg = await asyncio.wait_for(websocket.receive_text(), timeout=25.0)
+                # Client can send {"type":"pong"} or anything — we just keep the loop alive
+            except asyncio.TimeoutError:
+                try:
+                    await websocket.send_json({"type": "ping", "data": {"ts": now_iso()}})
+                except Exception:
+                    break
     except WebSocketDisconnect:
         pass
     except Exception:

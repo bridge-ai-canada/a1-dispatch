@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { ChartLineUp, CurrencyDollar, Wrench, UsersThree, ArrowUpRight, Clock } from "@phosphor-icons/react";
+import { ChartLineUp, CurrencyDollar, Wrench, UsersThree, ArrowUpRight, Clock, Star, Crown, ArrowsClockwise } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 
 const STATUS_COLORS = {
@@ -16,10 +16,14 @@ export default function Dashboard() {
     const { user } = useAuth();
     const [stats, setStats] = useState(null);
     const [recent, setRecent] = useState([]);
+    const [leaderboard, setLeaderboard] = useState([]);
+    const [forecast, setForecast] = useState(null);
 
     useEffect(() => {
         api.get("/dashboard/stats").then((r) => setStats(r.data)).catch(() => {});
         api.get("/jobs").then((r) => setRecent(r.data.slice(0, 6))).catch(() => {});
+        api.get("/dashboard/leaderboard").then((r) => setLeaderboard(r.data)).catch(() => {});
+        api.get("/dashboard/recurring-forecast").then((r) => setForecast(r.data)).catch(() => {});
     }, []);
 
     const kpis = [
@@ -113,6 +117,88 @@ export default function Dashboard() {
                         <div className="pt-3 border-t border-slate-200 flex items-center gap-2 text-xs text-slate-500">
                             <Clock size={14} /> Refreshed live
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Tech Leaderboard */}
+                <div className="border border-slate-200" data-testid="dashboard-leaderboard">
+                    <div className="px-5 py-3 border-b border-slate-200 flex items-center gap-2">
+                        <Crown size={14} weight="duotone" className="text-amber-500" />
+                        <h2 className="font-heading text-sm font-semibold uppercase tracking-wider">Tech Leaderboard · 30d</h2>
+                    </div>
+                    <div className="p-5">
+                        {leaderboard.length === 0 ? (
+                            <div className="text-sm text-slate-500 py-6 text-center">
+                                No ratings yet. Customers rate jobs from the portal.
+                            </div>
+                        ) : (
+                            <ol className="space-y-3">
+                                {leaderboard.slice(0, 5).map((t, idx) => (
+                                    <li key={t.tech_id} className="flex items-center gap-3" data-testid={`leaderboard-row-${t.tech_id}`}>
+                                        <div className="w-6 text-center font-display font-extrabold text-slate-400">{idx + 1}</div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-semibold truncate">{t.name}</div>
+                                            <div className="text-[11px] text-slate-500">{t.ratings_count} rating{t.ratings_count === 1 ? "" : "s"} · ${t.revenue.toFixed(0)} revenue</div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="flex items-center gap-1 justify-end">
+                                                <Star size={14} weight="fill" className="text-amber-400" />
+                                                <span className="font-mono font-bold">{t.rating_avg.toFixed(1)}</span>
+                                            </div>
+                                            {t.tip_total > 0 && (
+                                                <div className="text-[10px] text-emerald-600 font-semibold">+${t.tip_total.toFixed(0)} tips</div>
+                                            )}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ol>
+                        )}
+                    </div>
+                </div>
+
+                {/* Recurring revenue forecast */}
+                <div className="border border-slate-200" data-testid="dashboard-forecast">
+                    <div className="px-5 py-3 border-b border-slate-200 flex items-center gap-2">
+                        <ArrowsClockwise size={14} weight="duotone" className="text-emerald-600" />
+                        <h2 className="font-heading text-sm font-semibold uppercase tracking-wider">Recurring Revenue · 30d Forecast</h2>
+                    </div>
+                    <div className="p-5">
+                        <div className="grid grid-cols-2 gap-4 mb-5">
+                            <div>
+                                <div className="overline">Expected (30d)</div>
+                                <div className="font-display text-3xl font-extrabold tracking-tighter mt-1">
+                                    ${forecast?.total_expected?.toLocaleString() || "0"}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="overline">Annual run-rate</div>
+                                <div className="font-display text-3xl font-extrabold tracking-tighter mt-1 text-emerald-600">
+                                    ${forecast?.annual_contract_value?.toLocaleString() || "0"}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold mb-2">
+                            Top plans · {forecast?.active_plans || 0} active
+                        </div>
+                        {forecast?.plans?.length ? (
+                            <ul className="space-y-2">
+                                {forecast.plans.slice(0, 5).map((p) => (
+                                    <li key={p.id} className="flex items-center justify-between text-sm" data-testid={`forecast-row-${p.id}`}>
+                                        <div className="min-w-0">
+                                            <div className="font-medium truncate">{p.title}</div>
+                                            <div className="text-[11px] text-slate-500">{p.cadence} · {p.occurrences}× in 30d</div>
+                                        </div>
+                                        <div className="font-mono font-semibold">${p.expected_revenue.toFixed(0)}</div>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <div className="text-sm text-slate-500 py-2 text-center">
+                                No recurring plans yet. <Link to="/app/recurring" className="text-[#1D4ED8] font-semibold">Create one →</Link>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

@@ -1,0 +1,53 @@
+{
+  "summary": "Iteration-14 backend testing for A1 Field Pro v1.13. All 241 baseline tests still pass (one phase2c test is flaky when run in full suite but passes in isolation — unrelated race condition). Of 14 new tests for v1.13 features, 11 pass and 3 fail. The 3 failures are all geocoding-hook tests blocked by Nominatim returning 429 to this server's IP for every request. Root-causing this revealed a CRITICAL bug in geocode_service.py: non-200 responses (429, 5xx) are upserted into geocode_cache as permanent {lat:None, lng:None} rows, which then poison the cache so even after the rate-limit clears, future jobs with that address never get geocoded. The dashboard widgets (leaderboard, recurring-forecast), per-user push prefs (GET defaults, PUT persist, GET reflects), prefs-aware send (tag-based skip via direct send_push_to_user call, quiet-hours skip via POST /api/push/test), and WS connect/hello all work correctly.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "geocode_service.geocode (used by POST/PATCH /api/jobs)",
+        "issue": "Transient Nominatim errors (429 Too Many Requests, 5xx, network timeouts) are cached PERMANENTLY into geocode_cache as {lat:None, lng:None}. Future requests for the same address hit the cache and return None forever — the address can never be geocoded again, even after rate-limit clears. Repro: while Nominatim is rate-limiting, POST a job with any address → bad row written to geocode_cache. The fix is to only negative-cache when Nominatim returns 200 with an empty result array; for 4xx (non-404) and 5xx, return None without upserting (or add a TTL/expires_at and skip cache reads of expired-negative entries).",
+        "priority": "HIGH"
+      },
+      {
+        "endpoint": "POST/PATCH /api/jobs (geocode hook), GET /api/jobs/{id}",
+        "issue": "Geocoding tests (test_post_job_geocodes, test_second_job_uses_cache, test_patch_address_regeocodes) fail because Nominatim returns 429 for every request from this server. Hook is wired correctly (request is fired, throttle works, async task created), but no location is ever attached. This is partly the external rate-limit issue, and partly the bug above (the failure persists in cache).",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "POST /api/push/test",
+        "issue": "Test endpoint always uses tag='a1-test' which maps to no pref key, so /push/test cannot exercise tag-based pref filtering (job/pay/tip/rate/low-rate). Tag-based skip is therefore covered only by a direct send_push_to_user call in tests. Consider letting POST /api/push/test accept an optional `tag` param so QA can verify each pref key end-to-end."
+      },
+      {
+        "endpoint": "send_push_to_user quiet_hours math",
+        "issue": "Quiet hours boundary uses `qs <= now_h < qe` for normal range. With qs==qe (e.g., 0..0), the window is empty rather than 24h — minor edge case; reasonable but worth documenting."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_14.py",
+    "/app/test_reports/pytest/iter14_results.xml"
+  ],
+  "action_items": [
+    "Fix geocode_service.geocode to NOT cache non-200 transient errors (429/5xx/network). Only negative-cache when Nominatim returns 200 with empty data, or add an `expires_at` TTL so failures self-heal.",
+    "After fix, clear any rows in geocode_cache where lat is None to recover poisoned addresses (already cleared as part of this test run).",
+    "(Optional) Expand POST /api/push/test to accept a `tag` field so all pref categories can be QA'd via the API.",
+    "Investigate Nominatim 429 in preview env — the public IP may be persistently blocked. Consider falling back to a paid provider key for the preview cluster, or stub geocode_service in test mode."
+  ],
+  "critical_code_review_comments": [
+    "geocode_service.py: caches transient HTTP failures as permanent negatives — poisons cache.",
+    "geocode_service.py: in-memory `_last_call` throttle is per-process and resets on backend restart; cluster-wide it does not guarantee 1 req/sec to Nominatim.",
+    "bg_tasks.schedule_geocode uses asyncio.create_task without storing a reference — fire-and-forget; if backend restarts during the call, the geocode is lost with no retry. Acceptable for now but consider a queue with retries.",
+    "dashboard.tech_leaderboard ranks `rows` by rating_sum in mongo pipeline but then re-sorts in Python by (rating_avg DESC, tip_total DESC). The mongo $sort is effectively dead code; remove it for clarity.",
+    "dashboard.recurring_forecast `annual` calc uses `for p in plans if p.get('active')` but `plans` is already filtered to active:True — redundant guard."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration_14.py"],
+  "success_rate": {"backend": "251/255 = 98.4% (baseline 241/241 still green; 3 geocode failures due to bug+external rate limit; 1 flaky)", "frontend": "N/A (backend-only request)"},
+  "test_credentials": "demo@a1fieldpro.com / Demo1234! (owner), tech@a1fieldpro.com / Demo1234! (technician) — both valid",
+  "seed_data_creation": "Test creates and cleans up a few jobs prefixed TEST_geo_*. Also temporarily modifies push_prefs on the tech user, then resets to defaults at end of each test. Cleared poisoned rows from geocode_cache (12+2 rows) during debugging.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "After main agent fixes geocode_service to not cache 429/5xx, rerun /app/backend/tests/test_iteration_14.py::TestGeocode. The WS heartbeat 25s test is skipped by default — set env A1_RUN_WS_HEARTBEAT=1 to run it (adds ~30s). Nominatim is currently rate-limiting requests from this preview-cluster IP with 429 to every query, so end-to-end geocode tests may still fail until the upstream block lifts or a fallback provider is wired. After any geocode change, also wipe failure rows: db.geocode_cache.delete_many({'lat': None}).",
+  "rca of the issue": "BUG: /app/backend/geocode_service.py lines 46-63. When Nominatim returns r.status_code != 200, the code writes {address, lat:None, lng:None, source:'nominatim', cached_at:...} to geocode_cache. Because reads at lines 27-31 hit on `address` and short-circuit return None for any cached row with lat==None, transient failures (429, 502, 503, network timeouts) are converted into permanent un-geocodable addresses. REPRO: 1) clear cache; 2) cause Nominatim to 429 (we have it now); 3) POST /api/jobs with address='Foo'; 4) wait; GET /api/jobs/{id} — no location. 5) Even after Nominatim recovers and you restart the backend, that address is still unresolvable. FIX: split error handling — for non-200 status, return None WITHOUT upserting; only negative-cache the 200-but-empty case. Alternatively, add an 'expires_at' field on negative entries (e.g., 24h TTL) and skip-or-purge expired negatives at read time."
+}

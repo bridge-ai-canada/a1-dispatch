@@ -88,6 +88,10 @@ export default function PushOptIn() {
             <div className="flex items-center gap-2 flex-shrink-0">
                 {enabled ? (
                     <>
+                        <a href="/app/notifications" data-testid="push-prefs-link"
+                            className="px-3 h-9 border border-slate-300 hover:bg-slate-50 text-xs font-semibold flex items-center">
+                            Prefs
+                        </a>
                         <button onClick={sendTest} data-testid="push-test"
                             className="px-3 h-9 border border-slate-300 hover:bg-slate-50 text-xs font-semibold">
                             Test

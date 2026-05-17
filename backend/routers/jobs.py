@@ -69,6 +69,10 @@ async def create_job(body: JobIn, user: dict = Depends(get_current_user)):
         await hub.broadcast(user["company_id"], "job.created", doc)
     except Exception:
         pass
+    # Async geocode if there's an address
+    if doc.get("address"):
+        from bg_tasks import schedule_geocode
+        schedule_geocode(doc["id"], user["company_id"], doc["address"])
     if doc.get("customer_id"):
         await db.communications.insert_one({
             "id": str(uuid.uuid4()), "company_id": user["company_id"],
@@ -134,6 +138,10 @@ async def update_job(job_id: str, body: JobUpdate, user: dict = Depends(get_curr
         await hub.broadcast(user["company_id"], "job.updated", job)
     except Exception:
         pass
+    # Re-geocode if address changed
+    if "address" in updates and updates["address"]:
+        from bg_tasks import schedule_geocode
+        schedule_geocode(job_id, user["company_id"], updates["address"])
     new_status = updates.get("status")
     if new_status in ("scheduled", "in_progress", "completed", "cancelled"):
         await log_activity(user, f"jobs.{new_status}", "job", job_id,

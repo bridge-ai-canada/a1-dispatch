@@ -108,6 +108,10 @@ export default function Dispatch() {
             if (msg.data.priority === "emergency") toast("🚨 Emergency job created", { description: msg.data.title });
         } else if (msg.type === "job.updated") {
             setJobs((prev) => prev.map((j) => (j.id === msg.data.id ? { ...j, ...msg.data } : j)));
+        } else if (msg.type === "job.geocoded") {
+            setJobs((prev) => prev.map((j) =>
+                j.id === msg.data.job_id ? { ...j, location: msg.data.location } : j
+            ));
         } else if (msg.type === "user.status") {
             setLocations((prev) => prev.map((u) =>
                 u.id === msg.data.user_id ? { ...u, tech_status: msg.data.status, tech_status_at: msg.data.ts } : u

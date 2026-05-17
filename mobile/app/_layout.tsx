@@ -1,11 +1,14 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "../lib/auth";
+import { startAutoFlush } from "../lib/queue";
 import { Redirect } from "expo-router";
 import { View, ActivityIndicator } from "react-native";
+import { useEffect } from "react";
 import { colors } from "../lib/theme";
 
 export default function RootLayout() {
+    useEffect(() => { startAutoFlush(); }, []);
     return (
         <AuthProvider>
             <StatusBar style="dark" />
