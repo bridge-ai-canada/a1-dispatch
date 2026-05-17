@@ -27,6 +27,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import Portal from "./pages/Portal";
 import RecurringJobs from "./pages/RecurringJobs";
 import Reports from "./pages/Reports";
+import Dispatch from "./pages/Dispatch";
 
 function HashGuard({ children }) {
     // Per Emergent Auth playbook: detect session_id synchronously during render
@@ -84,6 +85,7 @@ function App() {
                         <Route path="admin/activity" element={<Activity />} />
                         <Route path="recurring" element={<RecurringJobs />} />
                         <Route path="reports" element={<Reports />} />
+                        <Route path="dispatch" element={<Dispatch />} />
                     </Route>
 
                     <Route path="*" element={<Navigate to="/" replace />} />

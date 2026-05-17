@@ -5,7 +5,7 @@ import {
     SquaresFour, Wrench, CalendarBlank, UsersThree,
     AddressBook, GearSix, SignOut, List, X, DeviceMobile,
     ShieldCheck, ClockCounterClockwise, Buildings, EnvelopeSimple,
-    ArrowsClockwise, ChartLine,
+    ArrowsClockwise, ChartLine, Broadcast,
 } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import api from "../lib/api";
@@ -15,6 +15,7 @@ import OfflineIndicator from "./OfflineIndicator";
 const baseNav = [
     { to: "/app/dashboard", label: "Dashboard", icon: SquaresFour, roles: ["owner","dispatcher","office_manager","csr","sales_rep","accountant","technician"] },
     { to: "/app/jobs", label: "Work Orders", icon: Wrench, roles: ["owner","dispatcher","office_manager","csr","sales_rep","accountant"] },
+    { to: "/app/dispatch", label: "Dispatch", icon: Broadcast, roles: ["owner","dispatcher","office_manager"] },
     { to: "/app/schedule", label: "Schedule", icon: CalendarBlank, roles: ["owner","dispatcher","office_manager"] },
     { to: "/app/team", label: "Team", icon: UsersThree, roles: ["owner","dispatcher","office_manager"] },
     { to: "/app/customers", label: "Customers", icon: AddressBook, roles: ["owner","dispatcher","office_manager","csr","sales_rep"] },

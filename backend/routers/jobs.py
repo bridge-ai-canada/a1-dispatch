@@ -64,6 +64,11 @@ async def create_job(body: JobIn, user: dict = Depends(get_current_user)):
     doc.pop("_id", None)
     await log_activity(user, "jobs.created", "job", doc["id"],
                        {"title": doc["title"], "status": doc["status"]})
+    try:
+        from ws_hub import hub
+        await hub.broadcast(user["company_id"], "job.created", doc)
+    except Exception:
+        pass
     if doc.get("customer_id"):
         await db.communications.insert_one({
             "id": str(uuid.uuid4()), "company_id": user["company_id"],
@@ -124,6 +129,11 @@ async def update_job(job_id: str, body: JobUpdate, user: dict = Depends(get_curr
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Job not found")
     job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    try:
+        from ws_hub import hub
+        await hub.broadcast(user["company_id"], "job.updated", job)
+    except Exception:
+        pass
     new_status = updates.get("status")
     if new_status in ("scheduled", "in_progress", "completed", "cancelled"):
         await log_activity(user, f"jobs.{new_status}", "job", job_id,

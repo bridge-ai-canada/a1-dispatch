@@ -33,6 +33,7 @@ export function AuthProvider({ children }) {
 
     const login = async (email, password, mfa_code) => {
         const { data } = await api.post("/auth/login", { email, password, mfa_code });
+        if (data.token) try { localStorage.setItem("a1.token", data.token); } catch (_) {}
         setUser(data.user);
         await refresh();
         return data.user;
@@ -40,6 +41,7 @@ export function AuthProvider({ children }) {
 
     const register = async (payload) => {
         const { data } = await api.post("/auth/register", payload);
+        if (data.token) try { localStorage.setItem("a1.token", data.token); } catch (_) {}
         setUser(data.user);
         await refresh();
         return data.user;
@@ -47,6 +49,7 @@ export function AuthProvider({ children }) {
 
     const logout = async () => {
         try { await api.post("/auth/logout"); } catch {}
+        try { localStorage.removeItem("a1.token"); } catch (_) {}
         setUser(false);
         setCompany(null);
     };

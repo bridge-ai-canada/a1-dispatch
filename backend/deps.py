@@ -403,6 +403,7 @@ class JobIn(BaseModel):
     duration_min: int = 60
     price: float = 0.0
     status: Literal["unscheduled", "scheduled", "in_progress", "completed", "cancelled"] = "unscheduled"
+    priority: Literal["low", "normal", "high", "emergency"] = "normal"
 
 class JobUpdate(BaseModel):
     title: Optional[str] = None
@@ -415,6 +416,7 @@ class JobUpdate(BaseModel):
     address: Optional[str] = None
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
+    priority: Optional[Literal["low", "normal", "high", "emergency"]] = None
 
 _CADENCE_DAYS = {
     "weekly": 7,

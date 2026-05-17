@@ -12,7 +12,7 @@ from deps import (
     init_storage,
     hash_password, verify_password,
 )
-from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push
+from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch
 
 app = FastAPI(title="A1 Field Pro API")
 api = APIRouter(prefix="/api")
@@ -29,6 +29,7 @@ api.include_router(recurring.router)
 api.include_router(exports.router)
 api.include_router(routes_opt.router)
 api.include_router(push.router)
+api.include_router(dispatch.router)
 
 
 @api.get("/")

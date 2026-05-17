@@ -1,0 +1,55 @@
+{
+  "summary": "Iteration-13 backend + frontend smoke for v1.12 Modern Dispatch Board. Built /app/backend/tests/test_iteration_13.py with 19 cases across 4 classes covering ALL new endpoints + WebSocket pub/sub: tech status, GPS location (with range validation), team locations (no _id, tenant-scoped), job priority (Literal + 404 cross-tenant + 404 missing), JobIn/JobUpdate priority field, WS hello, 5 broadcast types (job.created/job.updated x2 [via PATCH and PATCH /priority], user.status, user.location), and a strict no-cross-tenant-leak proof (fresh-registered tenant socket does NOT receive a job.created emitted in the demo tenant). Full regression: 241 backend tests, 241 passed (240/241 in one timed-window run due to a flaky ReadTimeout on test_phase_crm::test_timeline_merges_and_sorts — re-ran solo and passed; same test passed in iteration 12 baseline). Frontend smoke on /app/dispatch as owner: LIVE indicator green, all 4 tabs (Day/Week/Month/Map) clickable, Leaflet+OSM map renders with technician GPS marker at the seeded 31.0,-97.0 location, 1 EMERGENCY OPEN banner shows correctly, ZERO console errors.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "WebSocket /api/ws",
+        "issue": "Spec says 'reject bad/missing token with close code 4401', but implementation calls websocket.close(code=4401) BEFORE websocket.accept(). Starlette converts a pre-accept close into an HTTP 403 handshake rejection, so the 4401 close code is NEVER delivered to the client. The connection IS rejected (test verifies this), but any client code that branches on close code == 4401 will instead see an HTTP 403 / handshake failure. Fix: call await websocket.accept() first, then await websocket.close(code=4401, reason='invalid token'). Low impact because the WS client only needs to know 'auth failed' to retry, but worth tightening for spec compliance."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_13.py",
+    "/app/test_reports/pytest/iteration_13_results.xml",
+    "/app/test_reports/pytest/iteration_13_full.xml"
+  ],
+  "action_items": [
+    "OPTIONAL (minor spec compliance): In /app/backend/routers/dispatch.py ws_endpoint, swap order to `await websocket.accept(); await websocket.close(code=4401)` so the documented 4401 close code actually reaches the client. Current behavior rejects the connection via HTTP 403 handshake which is functionally fine but technically not the spec.",
+    "OPTIONAL: ws_hub.py:broadcast pops dead sockets inside a SECOND lock acquisition, but the initial sockets list is captured WITHOUT the lock (line 33). Tiny race window where a socket can be removed mid-iteration. Not observed in tests; safe to leave.",
+    "OPTIONAL: dispatch.ws_endpoint receive_text() loop has NO ping/pong heartbeat — relies entirely on Kubernetes ingress idle timeout. If ingress drops idle sockets, clients will reconnect via dispatchSocket.js auto-reconnect, so OK in practice."
+  ],
+  "critical_code_review_comments": [
+    "WS auth: JWT decoded with same secret + algorithm as HTTP — good. Both user_id and company_id are required from the payload (defense against tokens without company_id). ✓",
+    "WS broadcast: All 5 trigger sites (jobs.create line 69, jobs.patch line 134, dispatch.priority line 113, dispatch.status line 57, dispatch.location line 79) wrap the broadcast in try/except — backend never returns 500 if the hub call fails. ✓ Verified by closing the WS client mid-test and confirming the next REST POST still returns 200.",
+    "Tenant isolation: hub.broadcast is keyed strictly by company_id from the actor's JWT (not from the request body), so a malicious actor cannot inject events into another tenant. Cross-tenant leak test passes — fresh tenant socket NEVER receives events from demo tenant. ✓",
+    "team/locations: explicitly pops _id and returns only safe fields (id, name, role, tech_status, tech_status_at, last_location). No password_hash / mfa_secret leakage. ✓",
+    "Location validation: Pydantic Field(ge=-90, le=90) / (ge=-180, le=180) — all 4 boundary cases return 422. ✓",
+    "JobIn/JobUpdate priority: default 'normal' on JobIn, Optional on JobUpdate, both Literal-constrained ('low','normal','high','emergency'). Invalid values return 422. ✓",
+    "PATCH /jobs/{id}/priority: uses combined filter {id, company_id} on the update — naturally returns 404 for cross-tenant access (verified). Also returns 404 for missing jobs (verified). ✓",
+    "dispatch.set_priority broadcasts the FULL job document (after the update), not just {priority}. Consistent with /jobs PATCH which also broadcasts the full job — frontend can use one handler for both. ✓",
+    "ws_hub uses in-memory dict — sufficient for single-worker uvicorn (current deployment). If backend ever runs multiple workers, broadcasts will not cross workers; would need Redis pub/sub. Worth a future TODO.",
+    "dispatchSocket.js is referenced in the request but not under review here (frontend smoke only). The LIVE green indicator confirms the WS connection is established and receiving the hello frame."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration_13.py (NEW — 19 cases, 100% pass)",
+    "/app/test_reports/pytest/iteration_13_results.xml (NEW)",
+    "/app/test_reports/pytest/iteration_13_full.xml (NEW — 240/241, 1 flaky network timeout unrelated to v1.12)",
+    "/app/test_reports/iteration_13.json (NEW)"
+  ],
+  "success_rate": {
+    "backend": "100% effective (241/241 — 19 new iteration-13 tests + 222 prior baseline. The single 'failure' in the full-suite run was a requests.ReadTimeout on test_phase_crm::test_timeline_merges_and_sorts; re-ran in isolation and passed in 0.95s — flaky network, NOT a v1.12 regression.)",
+    "frontend": "Smoke pass — /app/dispatch loads as owner, LIVE indicator green, all 4 tabs (Day/Week/Month/Map) clickable, Leaflet map renders with technician marker, 0 console errors. Drag-and-drop NOT exercised (per request: 'main flows already verified via screenshot')."
+  },
+  "test_credentials": "demo@a1fieldpro.com / Demo1234! (owner), tech@a1fieldpro.com / Demo1234!. Cross-tenant tests register fresh tenants via POST /api/auth/register with email pattern TEST_iter13_{uuid8}@example.com.",
+  "seed_data_creation": "No DB seeding — tests use the already-seeded demo company + ephemeral fresh tenants created via /api/auth/register. All TEST_-prefixed jobs are deleted in their own test via DELETE /api/jobs/{id}. Fresh tenants are left behind (1 user + 1 company each) but use the TEST_iter13_ email prefix for easy cleanup if ever needed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "v1.12 Modern Dispatch Board is fully covered by 19 dedicated tests in test_iteration_13.py. Run: `export REACT_APP_BACKEND_URL=$(grep '^REACT_APP_BACKEND_URL=' /app/frontend/.env | cut -d= -f2-) && cd /app/backend && python -m pytest tests/test_iteration_13.py -v` → 19/19 in ~12s. Full suite: 241 tests in ~175s. KEY POINTS: (a) The `websockets` python library (16.0) IS installed — confirmed working through the K8s ingress. WS URL is `${BACKEND_URL.replace('https','wss')}/api/ws?token=<jwt>`. (b) WS auth rejection: server calls close BEFORE accept, so client sees HTTP 403, NOT close code 4401 — flagged as minor for main agent. (c) WS broadcasts: use a single connection + REST trigger in another thread via asyncio.to_thread(requests.post,...). The _ws_recv_until() helper drains messages until matching type or timeout — handles interleaved messages (hello + job.created + etc.). (d) Cross-tenant leak proof: register a fresh tenant, open WS as that tenant, trigger event in demo tenant, assert NO matching message arrives within 4s. (e) Some older tests (test_iteration_8, test_phase*) crash at COLLECTION if REACT_APP_BACKEND_URL is not exported — always export before pytest. (f) Flaky test alert: test_phase_crm::test_timeline_merges_and_sorts intermittently fails with requests.ReadTimeout=20s; passes on retry. Bump timeout if it bites again.",
+  "rca of the issue": "n/a — no functional bugs. One minor spec deviation found and flagged: ws_endpoint emits HTTP 403 instead of WS close code 4401 because close() is called before accept(). Fix is a one-line reorder. Mitigation: not strictly required since the connection is still rejected and the client (dispatchSocket.js) auto-reconnects on any failure — but the documented spec asks for 4401 to allow clients to distinguish 'auth failed, don't retry' from 'transient error, retry'. Reproduction: `wscat -c 'wss://host/api/ws?token=garbage'` returns HTTP 403, not WS close 4401."
+}
