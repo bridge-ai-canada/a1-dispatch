@@ -178,17 +178,38 @@ def require_perm(perm: str):
     return checker
 
 # -------------------- Email --------------------
-async def send_email(to: str, subject: str, html: str) -> Optional[str]:
+async def send_email(to: str, subject: str, html: str, *,
+                     actor: Optional[dict] = None, purpose: str = "") -> Optional[str]:
+    """Send an email via Resend and (optionally) emit an activity event with delivery status.
+    Returns the Resend email id on success, None on failure or when Resend isn't configured.
+    """
+    email_id: Optional[str] = None
+    status: str = "skipped"
+    error: str = ""
     if not RESEND_API_KEY:
         logger.warning(f"Resend not configured — skipped email to {to}: {subject}")
-        return None
-    try:
-        params = {"from": SENDER_EMAIL, "to": [to], "subject": subject, "html": html}
-        res = await asyncio.to_thread(resend.Emails.send, params)
-        return res.get("id") if isinstance(res, dict) else None
-    except Exception as e:
-        logger.error(f"Email send failed: {e}")
-        return None
+    else:
+        try:
+            params = {"from": SENDER_EMAIL, "to": [to], "subject": subject, "html": html}
+            res = await asyncio.to_thread(resend.Emails.send, params)
+            email_id = res.get("id") if isinstance(res, dict) else None
+            status = "sent" if email_id else "no_id"
+        except Exception as e:
+            logger.error(f"Email send failed: {e}")
+            status = "failed"
+            error = f"{type(e).__name__}: {e}"
+
+    if actor is not None:
+        meta = {"to": to, "subject": subject, "purpose": purpose, "status": status}
+        if email_id:
+            meta["email_id"] = email_id
+        if error:
+            meta["error"] = error[:200]
+        try:
+            await log_activity(actor, "email.sent", "email", email_id or "", meta)
+        except Exception as e:
+            logger.error(f"Activity log for email failed: {e}")
+    return email_id
 
 def email_layout(title: str, body_html: str, cta_label: str = "", cta_url: str = "") -> str:
     cta = f"""

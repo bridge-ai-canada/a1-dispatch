@@ -3,13 +3,26 @@ import { useParams, Link } from "react-router-dom";
 import { useEffect } from "react";
 import axios from "axios";
 import { toast, Toaster } from "sonner";
-import { Wrench, CheckCircle, ArrowRight, CalendarBlank as CalIcon } from "@phosphor-icons/react";
+import {
+    Wrench, CheckCircle, ArrowRight, CalendarBlank as CalIcon,
+    Snowflake, Drop, Lightning, Garage, House, Plug,
+} from "@phosphor-icons/react";
 import { Calendar } from "../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 const TYPES = ["HVAC", "Plumbing", "Electrical", "Garage Doors", "Roofing", "Appliance Repair", "Other"];
+
+const INDUSTRY_ICON = {
+    "HVAC": Snowflake,
+    "Plumbing": Drop,
+    "Electrical": Lightning,
+    "Garage Doors": Garage,
+    "Roofing": House,
+    "Appliance Repair": Plug,
+    "Other": Wrench,
+};
 
 function isLightColor(hex) {
     const m = (hex || "").match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
@@ -64,6 +77,7 @@ export default function BookingWidget() {
     const primary = branding.primary_color || "#1D4ED8";
     const accent  = branding.accent_color  || "#DC2626";
     const logoUrl = branding.logo_path ? `${API}/files/${branding.logo_path}` : null;
+    const IndustryIcon = INDUSTRY_ICON[company.industry] || INDUSTRY_ICON["Other"];
 
     return (
         <div className="min-h-screen bg-slate-50 py-12 px-4">
@@ -73,8 +87,14 @@ export default function BookingWidget() {
                     {logoUrl ? (
                         <img src={logoUrl} alt={company.name} className="mx-auto mb-4 max-h-20" />
                     ) : (
-                        <img src="https://customer-assets.emergentagent.com/job_a1-dispatch/artifacts/fpgawcoi_1000287215.png"
-                            alt="A1 Field Pro" className="mx-auto mb-4 h-16 w-auto" />
+                        <div
+                            data-testid="booking-industry-icon"
+                            aria-label={`${company.industry} service`}
+                            className="mx-auto mb-4 h-20 w-20 flex items-center justify-center rounded-2xl shadow-sm"
+                            style={{ background: primary }}
+                        >
+                            <IndustryIcon size={44} weight="duotone" color={isLightColor(primary) ? "#0F172A" : "#FFFFFF"} />
+                        </div>
                     )}
                     <h1 className="font-display text-4xl font-extrabold tracking-tighter mt-3">{company.name}</h1>
                     <p className="text-slate-500 mt-2">{company.industry} · Request a callback in 2 minutes</p>

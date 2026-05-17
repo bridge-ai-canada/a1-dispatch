@@ -120,10 +120,11 @@ class TestGoogleExchange:
 
     @pytest.mark.asyncio
     async def test_google_exchange_happy_path_creates_customer(self):
-        """Patch server's `requests.get` to simulate Emergent's session-data API.
+        """Patch the auth router's `requests.get` to simulate Emergent's session-data API.
         We exercise the handler in-process (it shares the same MongoDB as the live server)."""
         import importlib
-        server = importlib.import_module("server")
+        auth_mod = importlib.import_module("routers.auth")
+        deps_mod = importlib.import_module("deps")
 
         fake_email = f"test_g_{uuid.uuid4().hex[:8]}@example.com"
         fake_resp = MagicMock()
@@ -143,10 +144,10 @@ class TestGoogleExchange:
         }
         req = StarletteRequest(scope)
         resp = Response()
-        body = server.GoogleExchangeIn(session_id="fake-good-session")
-        with patch.object(server, "requests") as mock_requests:
+        body = deps_mod.GoogleExchangeIn(session_id="fake-good-session")
+        with patch.object(auth_mod, "requests") as mock_requests:
             mock_requests.get.return_value = fake_resp
-            out = await server.google_exchange(body, req, resp)
+            out = await auth_mod.google_exchange(body, req, resp)
         assert "user" in out and "token" in out
         u = out["user"]
         assert u["email"] == fake_email

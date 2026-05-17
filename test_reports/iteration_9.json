@@ -1,0 +1,46 @@
+{
+  "summary": "Iteration-9 backend testing for the v1.7 refactor + 3 P1 features (industry palette via /public/companies, customer portal rate/tip-checkout/payment-status, email.sent activity events). Built /app/backend/tests/test_iteration_9.py with 26 cases across 7 classes: regression-after-refactor (7), email.sent activity (1), portal rate RBAC+validation+persistence+activity (5), portal tip-checkout RBAC+validation+200 with Stripe URL+tx insert (5), portal payment-status 404-foreign-tx + already-paid short-circuit + 403 non-customer (3), public company industry field present + 404 (2), v1.6 rules still enforced — hex color, password strength, email-verify checkout gate (3). ALL 26 NEW TESTS PASS. Full suite: 146/146 PASS (120 baseline + 26 new). The 5 stale tests previously failing in iteration_8 (paginated customers + claude versioned model) are now resolved by main agent in this iteration.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "test files (test_iteration_8, test_phase1, test_phase2*)", "issue": "These files dereference os.environ['REACT_APP_BACKEND_URL'] at module-import time without a fallback — pytest fails at collection if the var isn't exported in the shell. Test runner must export REACT_APP_BACKEND_URL or tests should read /app/frontend/.env as a fallback. test_iteration_9.py implements the fallback correctly."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_9.py",
+    "/app/test_reports/pytest/iteration_9_results.xml",
+    "/app/test_reports/pytest/iteration_9_full.xml"
+  ],
+  "action_items": [
+    "Optional: have test files fall back to /app/frontend/.env REACT_APP_BACKEND_URL when env var unset (avoids collection-time KeyError when running ad-hoc).",
+    "Optional: portal.py duplicates the tip-credit + activity-insert logic in two places (webhook + /portal/payments/status/{sid}). Extract a single `credit_tip(tx)` helper to keep the two paths in lockstep.",
+    "Optional: in portal.tip_checkout, body.amount is float — consider clamping to 2 decimals and an upper bound (e.g., $500) to avoid pathological tips.",
+    "Optional: portal.rate stores rating_comment[:500] silently truncates — surface a 422 instead, or document the cap in the response."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now 167 lines (under 700-line guideline) with 8 cleanly-split routers under /app/backend/routers/. Mount order under /api prefix preserved. Regression confirms zero behavior change.",
+    "deps.send_email() correctly emits an activity event ONLY when an `actor` is passed in (opt-in), so legacy call sites without actor remain quiet — good backward compat. Meta shape {to, subject, purpose, status, email_id?, error?} matches spec verbatim.",
+    "portal._customer_only() is the right gate but is called PER-ENDPOINT instead of via FastAPI Depends — works but slightly more error-prone. Consider a router-level dependency: APIRouter(dependencies=[Depends(require_role('customer'))]).",
+    "portal.rate_job uses HTTPException(400, 'You can only rate completed visits') BEFORE checking rating bounds; rating bounds (1-5) is on Pydantic so it fires at 422 automatically — correct.",
+    "portal.tip_checkout: amount<=0 check is AFTER status-completed check; both return 400 — semantics fine, but could be reordered to fail fast on the cheap amount check.",
+    "portal.portal_payment_status: when tx already 'paid' it returns the raw `tx` dict (with _id stripped via projection) — but if Stripe says paid on this poll, the code does the credit work then re-queries with {_id:0} — consistent. Good.",
+    "payments.stripe_webhook (routers/payments.py:99-147) handles type=='tip' correctly by $inc jobs.tip and NOT flipping paid/status — matches the spec exactly. activity action='tip.received' logged.",
+    "public_routes.public_company correctly projects out owner_id and _id — `industry` is preserved on the response (verified by test). BookingWidget.jsx can use this field to pick an icon when no logo exists.",
+    "Hex color regex (^#[0-9A-Fa-f]{6}$) still enforced via Pydantic Field(pattern=...) on BrandingIn. Password strength still enforced on RegisterIn + ResetIn via field_validator. Email-verify gate still the first check in payments.create_checkout.",
+    "Minor DRY: routers/portal.py and routers/payments.py both rebuild webhook_url + StripeCheckout client inline 3 times. A factory `_stripe(request)` would dedupe."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration_9.py (NEW — 26 cases, 100% pass)",
+    "/app/test_reports/pytest/iteration_9_results.xml (NEW)",
+    "/app/test_reports/pytest/iteration_9_full.xml (NEW — full 146/146 pass)",
+    "/app/test_reports/iteration_9.json"
+  ],
+  "success_rate": {"backend": "100% (146/146 — 120 baseline + 26 new iteration-9 tests, zero regressions, zero new bugs)", "frontend": "not tested (backend-only iteration)"},
+  "test_credentials": "demo@a1fieldpro.com / Demo1234! (owner, email_verified=True, MFA off). superadmin@a1fieldpro.com / Super1234!. Plus per-run TEST_owner_*/test_owner_*/test_cust_* (random suffix) inserted and cleaned up by the portal_scenario fixture.",
+  "seed_data_creation": "portal_scenario module-scoped fixture inserts: 1 company (TEST_co_<8hex>), 1 owner (test_owner_<8hex>@example.com / Owner1234!, email_verified=True), 1 customer-role user (test_cust_<8hex>@example.com / Cust1234!, role=customer, no company_id), 2 jobs (1 completed + 1 scheduled) — all cleaned up in teardown (users, company, jobs, related activity, related payment_transactions).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All v1.7 backend behavior is correct and locked in by 26 dedicated tests. To run the FULL suite locally: `cd /app/backend && REACT_APP_BACKEND_URL=https://a1-dispatch.preview.emergentagent.com python -m pytest tests/ -v` → 146/146 pass in ~60s. test_iteration_9.py is the canonical regression set for the refactor + new portal/email-activity features. Use `run_db(async fn(db))` helper to talk to MongoDB from tests without sharing motor's event-loop state — never reuse `from deps import db` inside test bodies. Customer-role users must be created with role='customer' and a `company_id` that is None or matches the job's company; only `customer_email` on the job is matched against `user.email` for portal RBAC.",
+  "rca of the issue": "n/a — no bugs found. Initial test failures during dev were tester-side: (1) inserted user emails contained uppercase 'TEST_' prefix but /api/auth/login lowercases the incoming email and lookups by exact match — fixed by switching seeded emails to lowercase 'test_'. (2) motor.AsyncIOMotorClient binds to the asyncio event-loop where it was first awaited; pytest's per-test loop closes between calls, so reusing the module-level `db` from deps.py with `asyncio.run()` in different tests raises 'Event loop is closed' — fixed by introducing `run_db(coro_factory)` which creates a fresh AsyncIOMotorClient inside each asyncio.run() block and closes it before returning."
+}

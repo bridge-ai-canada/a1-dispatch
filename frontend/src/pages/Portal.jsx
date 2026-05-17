@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import api, { API_BASE } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import Brand from "../components/Brand";
 import { startGoogleLogin } from "./AuthCallback";
-import { Wrench, MapPin, Clock, CreditCard, GoogleLogo, SignOut } from "@phosphor-icons/react";
+import { toast, Toaster } from "sonner";
+import { Wrench, MapPin, Clock, CreditCard, GoogleLogo, SignOut, Star, HandHeart } from "@phosphor-icons/react";
 
 const STATUS_COLORS = {
     unscheduled: "bg-slate-100 text-slate-700",
@@ -14,16 +15,47 @@ const STATUS_COLORS = {
     cancelled: "bg-red-50 text-[#DC2626]",
 };
 
+const TIP_PRESETS = [5, 10, 20, 40];
+
 export default function Portal() {
     const { user, loading, logout } = useAuth();
     const [jobs, setJobs] = useState([]);
     const [companies, setCompanies] = useState([]);
+    const [params, setParams] = useSearchParams();
+
+    const refresh = () => {
+        api.get("/portal/jobs").then((r) => setJobs(r.data)).catch(() => {});
+    };
 
     useEffect(() => {
         if (!user || user.role !== "customer") return;
-        api.get("/portal/jobs").then((r) => setJobs(r.data)).catch(() => {});
+        refresh();
         api.get("/portal/companies").then((r) => setCompanies(r.data)).catch(() => {});
     }, [user]);
+
+    // After Stripe redirect: poll for tip status
+    useEffect(() => {
+        const sessionId = params.get("session_id");
+        const tippedJob = params.get("tipped");
+        if (!sessionId || !tippedJob) return;
+        let cancelled = false;
+        let attempts = 0;
+        const poll = async () => {
+            if (cancelled || attempts++ > 6) return;
+            try {
+                const { data } = await api.get(`/portal/payments/status/${sessionId}`);
+                if (data.payment_status === "paid") {
+                    toast.success("Thanks for the tip! Your tech will appreciate it.");
+                    setParams({}, { replace: true });
+                    refresh();
+                    return;
+                }
+            } catch (_) {}
+            setTimeout(poll, 2000);
+        };
+        poll();
+        return () => { cancelled = true; };
+    }, [params]);
 
     if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-500">Loading...</div>;
 
@@ -59,6 +91,7 @@ export default function Portal() {
 
     return (
         <div className="min-h-screen bg-white" data-testid="portal-page">
+            <Toaster position="top-right" richColors />
             <header className="border-b border-slate-200">
                 <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
                     <Brand />
@@ -102,7 +135,7 @@ export default function Portal() {
 
                 <Group title="Upcoming" jobs={upcoming} empty="No visits scheduled." />
                 <Group title="Pending requests" jobs={requests} empty="No pending requests." />
-                <Group title="Past visits" jobs={past} empty="No past visits yet." showInvoice />
+                <Group title="Past visits" jobs={past} empty="No past visits yet." showInvoice onRefresh={refresh} />
             </main>
         </div>
     );
@@ -117,7 +150,7 @@ function Section({ label, children }) {
     );
 }
 
-function Group({ title, jobs, empty, showInvoice }) {
+function Group({ title, jobs, empty, showInvoice, onRefresh }) {
     return (
         <Section label={`${title} · ${jobs.length}`}>
             {jobs.length === 0 ? (
@@ -144,7 +177,11 @@ function Group({ title, jobs, empty, showInvoice }) {
                                 </span>
                             </div>
                             <div className="mt-3 flex items-center justify-between">
-                                <div className="font-mono text-sm">${(j.price || 0).toFixed(2)} {j.paid && <span className="ml-2 text-emerald-600 font-semibold">PAID</span>}</div>
+                                <div className="font-mono text-sm">
+                                    ${(j.price || 0).toFixed(2)}
+                                    {j.paid && <span className="ml-2 text-emerald-600 font-semibold">PAID</span>}
+                                    {j.tip > 0 && <span className="ml-2 text-emerald-600 font-semibold">+${j.tip.toFixed(2)} TIP</span>}
+                                </div>
                                 {showInvoice && j.price > 0 && (
                                     <a href={`${API_BASE}/jobs/${j.id}/invoice.pdf`} target="_blank" rel="noopener noreferrer"
                                         className="text-xs flex items-center gap-1 px-2 py-1 border border-slate-300 hover:bg-slate-50">
@@ -152,10 +189,123 @@ function Group({ title, jobs, empty, showInvoice }) {
                                     </a>
                                 )}
                             </div>
+                            {j.status === "completed" && (
+                                <RateAndTip job={j} onDone={onRefresh} />
+                            )}
                         </div>
                     ))}
                 </div>
             )}
         </Section>
+    );
+}
+
+function RateAndTip({ job, onDone }) {
+    const [rating, setRating] = useState(job.rating || 0);
+    const [hovered, setHovered] = useState(0);
+    const [comment, setComment] = useState(job.rating_comment || "");
+    const [savingRating, setSavingRating] = useState(false);
+    const [customTip, setCustomTip] = useState("");
+    const [submittingTip, setSubmittingTip] = useState(false);
+    const alreadyRated = !!job.rating;
+
+    const submitRating = async () => {
+        if (!rating) return toast.error("Pick a star rating first");
+        setSavingRating(true);
+        try {
+            await api.post(`/portal/jobs/${job.id}/rate`, { rating, comment });
+            toast.success("Thanks for the feedback!");
+            onDone && onDone();
+        } catch (err) {
+            toast.error(err.response?.data?.detail || "Could not save rating");
+        } finally {
+            setSavingRating(false);
+        }
+    };
+
+    const startTip = async (amount) => {
+        if (!amount || amount <= 0) return toast.error("Enter a tip amount");
+        setSubmittingTip(true);
+        try {
+            const { data } = await api.post(`/portal/jobs/${job.id}/tip-checkout`, {
+                amount: Number(amount),
+                origin_url: window.location.origin,
+            });
+            window.location.href = data.url;
+        } catch (err) {
+            toast.error(err.response?.data?.detail || "Could not start tip checkout");
+            setSubmittingTip(false);
+        }
+    };
+
+    return (
+        <div className="mt-4 border-t border-slate-100 pt-4 grid sm:grid-cols-2 gap-6" data-testid={`portal-rate-tip-${job.id}`}>
+            {/* Rating */}
+            <div>
+                <div className="overline mb-2 flex items-center gap-1.5"><Star size={12} /> Rate this visit</div>
+                <div className="flex items-center gap-1" data-testid={`portal-rating-stars-${job.id}`}>
+                    {[1,2,3,4,5].map((n) => {
+                        const filled = (hovered || rating) >= n;
+                        return (
+                            <button key={n} type="button" disabled={alreadyRated}
+                                onClick={() => setRating(n)}
+                                onMouseEnter={() => !alreadyRated && setHovered(n)}
+                                onMouseLeave={() => setHovered(0)}
+                                data-testid={`portal-star-${n}-${job.id}`}
+                                className={`p-1 ${alreadyRated ? "cursor-default" : "cursor-pointer"}`}>
+                                <Star size={22} weight={filled ? "fill" : "regular"} className={filled ? "text-amber-400" : "text-slate-300"} />
+                            </button>
+                        );
+                    })}
+                </div>
+                {!alreadyRated ? (
+                    <>
+                        <textarea
+                            value={comment}
+                            onChange={(e) => setComment(e.target.value)}
+                            placeholder="Anything to tell the team? (optional)"
+                            rows={2}
+                            data-testid={`portal-rating-comment-${job.id}`}
+                            className="mt-2 w-full border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]"
+                        />
+                        <button onClick={submitRating} disabled={savingRating || !rating}
+                            data-testid={`portal-rating-submit-${job.id}`}
+                            className="mt-2 px-3 py-1.5 bg-[#1D4ED8] text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50">
+                            {savingRating ? "Saving..." : "Submit rating"}
+                        </button>
+                    </>
+                ) : (
+                    <p className="mt-2 text-xs text-emerald-600">Rated {job.rating}/5 — thanks!</p>
+                )}
+            </div>
+
+            {/* Tip */}
+            <div>
+                <div className="overline mb-2 flex items-center gap-1.5"><HandHeart size={12} /> Tip your tech</div>
+                <div className="flex flex-wrap gap-2" data-testid={`portal-tip-presets-${job.id}`}>
+                    {TIP_PRESETS.map((amt) => (
+                        <button key={amt} onClick={() => startTip(amt)} disabled={submittingTip}
+                            data-testid={`portal-tip-${amt}-${job.id}`}
+                            className="px-3 py-1.5 border border-slate-300 hover:border-[#1D4ED8] hover:bg-blue-50/30 text-sm font-semibold disabled:opacity-50">
+                            ${amt}
+                        </button>
+                    ))}
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                    <input
+                        type="number" min="1" step="1" placeholder="Other amount"
+                        value={customTip} onChange={(e) => setCustomTip(e.target.value)}
+                        data-testid={`portal-tip-custom-${job.id}`}
+                        className="w-32 border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]"
+                    />
+                    <button onClick={() => startTip(customTip)} disabled={submittingTip || !customTip}
+                        data-testid={`portal-tip-submit-${job.id}`}
+                        className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50">
+                        {submittingTip ? "Redirecting..." : "Tip"}
+                    </button>
+                </div>
+                {job.tip > 0 && <p className="mt-2 text-xs text-emerald-600">You've tipped ${job.tip.toFixed(2)} — thank you!</p>}
+            </div>
+        </div>
     );
 }
