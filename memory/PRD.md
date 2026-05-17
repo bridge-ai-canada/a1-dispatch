@@ -104,6 +104,21 @@ Testing: backend **77/77** pytest pass (14 new + 63 prior); frontend critical fl
 
 Testing: 146 baseline + 35 new = **181/181 backend tests green**, 0 critical issues.
 
+## What's been implemented (Geocoding + dashboard widgets + notif prefs — Feb 2026 — v1.13)
+- **Nominatim geocoding** (`geocode_service.py`): free OSM-backed lookup with 1 req/sec throttle and persistent DB cache (`geocode_cache`). Background-task hook on `POST /api/jobs` and `PATCH /api/jobs/{id}` (when address changes) — within seconds, the job doc gains `location:{lat,lng,display_name}` and the dispatch map auto-pins it via a new WS `job.geocoded` broadcast. **Fixed critical cache-poisoning bug** flagged by testing: transient errors (429 rate-limit, 5xx, network) no longer cached; negative caches expire after 7 days for self-healing.
+- **WS heartbeat**: server emits `{type:"ping"}` after 25s of client silence so long-idle ingress timeouts don't kill the dispatch board.
+- **Tech leaderboard widget** on Dashboard: top 5 techs ranked by 30-day rating average + tip total + revenue. Single MongoDB aggregation. Hidden when no rated jobs.
+- **30-day recurring-revenue forecast widget** on Dashboard: total expected revenue from active plans in the next 30 days + annual contract value + top-5 plan breakdown. No external service needed; pure computation from existing data.
+- **Per-user notification preferences** (`/api/me/push-prefs` GET + PUT): toggle each event class (job_assigned, job_rescheduled, payment_received, tip_received, rating_created, rating_low_alert, recurring_materialized) + UTC quiet-hours window. `send_push_to_user` checks prefs via push-tag prefix routing and short-circuits with `{skipped: true}` when disabled or in quiet hours.
+- **Frontend NotificationPrefs page** at `/app/notifications`: 7 toggles, optional quiet-hours range pickers, link from the PushOptIn tile on /app/my-jobs.
+
+### Mobile app additions (`/app/mobile/`)
+- **Camera + library photo upload** via `expo-image-picker` (Camera or Library button on Job detail).
+- **Signature capture** via `react-native-signature-canvas` modal — saves base64 to `POST /api/jobs/{id}/signature`.
+- **Offline queue** (`lib/queue.ts` — AsyncStorage-backed): when a status update fails due to no connectivity, it's queued and auto-flushed every 20s. Job detail shows a "N changes pending sync" banner. `startAutoFlush()` initialized in root layout.
+
+Testing: 241 baseline + 11 new = **252 backend tests passing**, 0 critical bugs after fix. 1 critical cache-poisoning bug identified by testing agent **fixed**. Mobile: `tsc --noEmit` clean.
+
 ## What's been implemented (Modern Dispatch Board — Feb 2026 — v1.12)
 
 ### Backend
@@ -219,6 +234,16 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 
 ### P1 — Remaining
 - Apple login (needs Apple Developer credentials from user)
+
+### v1.13 — Done
+- ✅ Nominatim geocoding for job addresses (auto-pins on dispatch map)
+- ✅ WS heartbeat (25s server ping)
+- ✅ Tech leaderboard widget on dashboard
+- ✅ 30-day recurring-revenue forecast widget on dashboard
+- ✅ Per-user notification preferences (event toggles + quiet hours, prefs-aware push)
+- ✅ Mobile camera + library photo upload (`expo-image-picker`)
+- ✅ Mobile signature capture (`react-native-signature-canvas`)
+- ✅ Mobile offline queue (`AsyncStorage` + 20s auto-flush)
 
 ### P2 — Future
 - Apple login (needs Apple Developer credentials)
