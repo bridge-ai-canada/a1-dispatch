@@ -95,7 +95,7 @@ async def payment_status(session_id: str, request: Request, user: dict = Depends
         # Push to job owner (creator) — could be dispatcher/owner who sent the link
         try:
             from push_service import send_push_to_user
-            job_doc = await db.jobs.find_one({"id": tx["job_id"]}, {"_id": 0, "title": 1, "created_by": 1, "assigned_to": 1})
+            job_doc = await db.jobs.find_one({"id": tx["job_id"]}, {"title": 1, "created_by": 1, "assigned_to": 1})
             recipient = (job_doc or {}).get("created_by") or (job_doc or {}).get("assigned_to")
             if recipient:
                 await send_push_to_user(recipient, {
@@ -161,7 +161,7 @@ async def stripe_webhook(request: Request):
                 # Push to job creator/assignee on payment or tip
                 try:
                     from push_service import send_push_to_user
-                    job_doc = await db.jobs.find_one({"id": tx["job_id"]}, {"_id": 0, "title": 1, "created_by": 1, "assigned_to": 1})
+                    job_doc = await db.jobs.find_one({"id": tx["job_id"]}, {"title": 1, "created_by": 1, "assigned_to": 1})
                     recipient = (job_doc or {}).get("created_by") or (job_doc or {}).get("assigned_to")
                     if recipient:
                         label = "Tip received" if action == "tip.received" else "Payment received"

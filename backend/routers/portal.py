@@ -85,7 +85,7 @@ async def rate_job(job_id: str, body: RateIn, user: dict = Depends(get_current_u
                 "tag": f'rate-{job_id}',
             })
         if body.rating <= 2 and job.get("company_id"):
-            company = await db.companies.find_one({"id": job["company_id"]}, {"_id": 0, "owner_id": 1})
+            company = await db.companies.find_one({"id": job["company_id"]}, {"owner_id": 1})
             if company and company.get("owner_id"):
                 await send_push_to_user(company["owner_id"], {
                     "title": "Low rating — needs attention",
@@ -192,7 +192,7 @@ async def portal_payment_status(
         })
         try:
             from push_service import send_push_to_user
-            job_doc = await db.jobs.find_one({"id": tx["job_id"]}, {"_id": 0, "title": 1, "assigned_to": 1, "created_by": 1})
+            job_doc = await db.jobs.find_one({"id": tx["job_id"]}, {"title": 1, "assigned_to": 1, "created_by": 1})
             recipient = (job_doc or {}).get("assigned_to") or (job_doc or {}).get("created_by")
             if recipient:
                 await send_push_to_user(recipient, {

@@ -115,7 +115,7 @@ async def update_job(job_id: str, body: JobUpdate, user: dict = Depends(get_curr
     # Capture prior assignee so we can notify on reassignment
     prior = await db.jobs.find_one(
         {"id": job_id, "company_id": user["company_id"]},
-        {"_id": 0, "assigned_to": 1, "scheduled_at": 1, "title": 1},
+        {"assigned_to": 1, "scheduled_at": 1, "title": 1},
     )
     updates["updated_at"] = now_iso()
     result = await db.jobs.update_one(

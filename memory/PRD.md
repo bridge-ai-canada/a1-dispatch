@@ -104,6 +104,18 @@ Testing: backend **77/77** pytest pass (14 new + 63 prior); frontend critical fl
 
 Testing: 146 baseline + 35 new = **181/181 backend tests green**, 0 critical issues.
 
+## What's been implemented (Push expansion + UX polish — Feb 2026 — v1.11)
+- **New work order time fields**: The job modal now has both **Scheduled** start AND **Ends** datetime pickers alongside Duration and Price. Changing either time auto-recomputes duration; changing duration auto-extends the end picker. Form remains backwards-compatible — backend still stores `scheduled_at + duration_min` only.
+- **Push notifications for 3 additional events**:
+  - **`payment.received`** — pushes to job creator (or fallback to assigned tech) on both Stripe poll and webhook flows. `"Payment received · $X.XX for <job>"`.
+  - **`tip.received`** — pushes to assigned tech (or fallback to creator) on both portal poll and webhook flows. `"Tip received · $X.XX from <customer>"`.
+  - **`rating.created`** — pushes to assigned tech with star count + customer name. **Extra: low-rating alerts** (1–2 stars) also push to the company owner under a separate `low-rate-{job_id}` tag.
+  - **`recurring.materialized`** — pushes to the assigned tech of newly auto-created occurrences (both lazy `_materialize_due` and force `/run` paths).
+- **Robust projections**: Removed `_id:0` from inclusion-only Mongo projections to avoid Motor-version fragility (critical action item from testing agent).
+- **Native React Native scaffolding** (`/app/mobile/`): Expo SDK 51 + Expo Router + TypeScript app with login screen, today/all/profile tabs, job detail with Start/Complete/Charge buttons + tap-to-call/map. Source-code only — build & run locally with `npx expo start`. Same `/api/*` endpoints as web. Wire it up in 5 minutes on a Mac.
+
+Testing: 207 baseline + 15 new push hooks = **222/222 backend tests green**, 0 critical issues. Mobile app: `tsc --noEmit` clean.
+
 ## What's been implemented (Web-Push pipeline — Feb 2026 — v1.10)
 - **VAPID keys** auto-generated and persisted to `backend/.env` (`VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT`).
 - **Backend push service** (`push_service.py`): `send_push_to_user(user_id, payload)` sends to every active subscription for the user via `pywebpush`. Subscriptions that return 404/410 are automatically removed.
@@ -171,6 +183,11 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 ### v1.10 — Done
 - ✅ Backend Web-Push trigger pipeline (VAPID, subscription endpoint, send-on-event hooks)
 
+### v1.11 — Done
+- ✅ Push notifications for 3 additional events (payment.received, tip.received, rating.created with low-rating owner alert, recurring.materialized)
+- ✅ Work order start + end time fields in new-job modal
+- ✅ Native React Native scaffolding (`/app/mobile/` — Expo SDK 51, source-code only)
+
 ### P1 — Remaining
 - Apple login (needs Apple Developer credentials from user)
 
@@ -179,8 +196,8 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - Real geocoding for route optimization (Google Maps / Mapbox API)
 - SMS notifications (Twilio — needs credentials)
 - Booking-confirmation email back to customers
-- Native React Native app (separate codebase, requires local Xcode/Expo build environment)
-- Push for other events: payment received, customer rated job, recurring job materialized
+- Mobile app push (Expo Notifications) — adapter from VAPID web push to FCM/APNs tokens
+- Mobile app: photo upload (`expo-image-picker`), signature capture, offline queue
 
 ## Demo credentials
 Owner: `demo@a1fieldpro.com` / `Demo1234!`
