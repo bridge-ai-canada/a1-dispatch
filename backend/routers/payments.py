@@ -92,6 +92,20 @@ async def payment_status(session_id: str, request: Request, user: dict = Depends
         )
         await log_activity(user, "payment.received", "job", tx["job_id"],
                            {"amount": tx.get("amount"), "currency": tx.get("currency", "usd")})
+        # Push to job owner (creator) — could be dispatcher/owner who sent the link
+        try:
+            from push_service import send_push_to_user
+            job_doc = await db.jobs.find_one({"id": tx["job_id"]}, {"_id": 0, "title": 1, "created_by": 1, "assigned_to": 1})
+            recipient = (job_doc or {}).get("created_by") or (job_doc or {}).get("assigned_to")
+            if recipient:
+                await send_push_to_user(recipient, {
+                    "title": "Payment received",
+                    "body": f'${tx.get("amount", 0):.2f} for {(job_doc or {}).get("title","job")}',
+                    "url": f'/app/jobs/{tx["job_id"]}',
+                    "tag": f'pay-{tx["job_id"]}',
+                })
+        except Exception:
+            pass
     tx = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
     return tx
 
@@ -144,4 +158,19 @@ async def stripe_webhook(request: Request):
                     "meta": {"amount": tx.get("amount"), "currency": tx.get("currency", "usd"), "session_id": evt.session_id},
                     "created_at": now_iso(),
                 })
+                # Push to job creator/assignee on payment or tip
+                try:
+                    from push_service import send_push_to_user
+                    job_doc = await db.jobs.find_one({"id": tx["job_id"]}, {"_id": 0, "title": 1, "created_by": 1, "assigned_to": 1})
+                    recipient = (job_doc or {}).get("created_by") or (job_doc or {}).get("assigned_to")
+                    if recipient:
+                        label = "Tip received" if action == "tip.received" else "Payment received"
+                        await send_push_to_user(recipient, {
+                            "title": label,
+                            "body": f'${tx.get("amount", 0):.2f} for {(job_doc or {}).get("title","job")}',
+                            "url": f'/app/jobs/{tx["job_id"]}',
+                            "tag": f'pay-{tx["job_id"]}',
+                        })
+                except Exception:
+                    pass
     return {"received": True}

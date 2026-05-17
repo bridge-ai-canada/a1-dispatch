@@ -75,6 +75,23 @@ async def _materialize_due(company_id: str) -> int:
                 "next_run_at": _next_run(scheduled_at, days),
             }},
         )
+        # Push to the assigned technician (if any)
+        try:
+            if job_doc.get("assigned_to"):
+                from push_service import send_push_to_user
+                when = ""
+                try:
+                    when = " · " + datetime.fromisoformat(scheduled_at).strftime("%a %I:%M %p")
+                except Exception:
+                    pass
+                await send_push_to_user(job_doc["assigned_to"], {
+                    "title": "Recurring job created",
+                    "body": f'{job_doc["title"]}{when}',
+                    "url": f'/app/jobs/{job_doc["id"]}',
+                    "tag": f'job-{job_doc["id"]}',
+                })
+        except Exception:
+            pass
         count += 1
     return count
 
@@ -190,4 +207,20 @@ async def run_recurring(rid: str, user: dict = Depends(get_current_user)):
     job_doc.pop("_id", None)
     await log_activity(user, "recurring.materialized", "recurring_job", rid,
                        {"job_id": job_doc["id"]})
+    try:
+        if job_doc.get("assigned_to") and job_doc["assigned_to"] != user["id"]:
+            from push_service import send_push_to_user
+            when = ""
+            try:
+                when = " · " + datetime.fromisoformat(scheduled_at).strftime("%a %I:%M %p")
+            except Exception:
+                pass
+            await send_push_to_user(job_doc["assigned_to"], {
+                "title": "Recurring job created",
+                "body": f'{job_doc["title"]}{when}',
+                "url": f'/app/jobs/{job_doc["id"]}',
+                "tag": f'job-{job_doc["id"]}',
+            })
+    except Exception:
+        pass
     return job_doc

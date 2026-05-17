@@ -1,0 +1,35 @@
+{
+    "expo": {
+        "name": "A1 Field Pro",
+        "slug": "a1-field-pro",
+        "version": "1.0.0",
+        "orientation": "portrait",
+        "icon": "./assets/icon.png",
+        "scheme": "a1fieldpro",
+        "userInterfaceStyle": "automatic",
+        "splash": {
+            "image": "./assets/icon.png",
+            "resizeMode": "contain",
+            "backgroundColor": "#0F172A"
+        },
+        "assetBundlePatterns": ["**/*"],
+        "ios": {
+            "supportsTablet": true,
+            "bundleIdentifier": "com.a1fieldpro.mobile"
+        },
+        "android": {
+            "adaptiveIcon": {
+                "foregroundImage": "./assets/icon.png",
+                "backgroundColor": "#1D4ED8"
+            },
+            "package": "com.a1fieldpro.mobile"
+        },
+        "plugins": ["expo-router", "expo-secure-store"],
+        "experiments": {
+            "typedRoutes": true
+        },
+        "extra": {
+            "apiUrl": "https://a1-dispatch.preview.emergentagent.com"
+        }
+    }
+}

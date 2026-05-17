@@ -73,6 +73,28 @@ async def rate_job(job_id: str, body: RateIn, user: dict = Depends(get_current_u
         "meta": {"rating": body.rating, "tech_id": job.get("assigned_to")},
         "created_at": now_iso(),
     })
+    # Push to the technician (and to the company owner if a low rating)
+    try:
+        from push_service import send_push_to_user
+        if job.get("assigned_to"):
+            stars = "⭐" * body.rating
+            await send_push_to_user(job["assigned_to"], {
+                "title": f"You got {body.rating}/5 stars",
+                "body": f'{stars} from {user.get("name") or user["email"]} on "{job.get("title","")}"',
+                "url": f'/app/jobs/{job_id}',
+                "tag": f'rate-{job_id}',
+            })
+        if body.rating <= 2 and job.get("company_id"):
+            company = await db.companies.find_one({"id": job["company_id"]}, {"_id": 0, "owner_id": 1})
+            if company and company.get("owner_id"):
+                await send_push_to_user(company["owner_id"], {
+                    "title": "Low rating — needs attention",
+                    "body": f'{body.rating}/5 stars from {user.get("name") or user["email"]} on "{job.get("title","")}"',
+                    "url": f'/app/jobs/{job_id}',
+                    "tag": f'low-rate-{job_id}',
+                })
+    except Exception:
+        pass
     return {"ok": True, "rating": body.rating}
 
 
@@ -168,4 +190,17 @@ async def portal_payment_status(
             "meta": {"amount": tx["amount"], "currency": tx.get("currency", "usd")},
             "created_at": now_iso(),
         })
+        try:
+            from push_service import send_push_to_user
+            job_doc = await db.jobs.find_one({"id": tx["job_id"]}, {"_id": 0, "title": 1, "assigned_to": 1, "created_by": 1})
+            recipient = (job_doc or {}).get("assigned_to") or (job_doc or {}).get("created_by")
+            if recipient:
+                await send_push_to_user(recipient, {
+                    "title": "Tip received",
+                    "body": f'${tx["amount"]:.2f} from {user.get("name") or user["email"]}',
+                    "url": f'/app/jobs/{tx["job_id"]}',
+                    "tag": f'tip-{tx["job_id"]}',
+                })
+        except Exception:
+            pass
     return await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})

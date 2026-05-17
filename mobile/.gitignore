@@ -1,0 +1,20 @@
+node_modules/
+.expo/
+.expo-shared/
+dist/
+web-build/
+
+# OS
+.DS_Store
+
+# Env
+.env
+.env.local
+
+# Native build folders
+ios/
+android/
+
+# IDE
+.vscode/
+.idea/

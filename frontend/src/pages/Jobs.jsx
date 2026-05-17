@@ -5,6 +5,15 @@ import { Plus, X, CreditCard } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 
 const STATUS = ["unscheduled", "scheduled", "in_progress", "completed", "cancelled"];
+
+// Convert an ISO datetime to the YYYY-MM-DDTHH:MM local string expected by <input type="datetime-local">.
+function toLocalDt(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 const STATUS_COLORS = {
     unscheduled: "bg-slate-100 text-slate-700 border-slate-300",
     scheduled: "bg-blue-50 text-[#1D4ED8] border-[#1D4ED8]/30",
@@ -152,10 +161,10 @@ export default function Jobs() {
 }
 
 function JobModal({ onClose, onSaved, team, initial }) {
-    const [form, setForm] = useState(initial || {
+    const [form, setForm] = useState(initial ? { ...initial, end_at: "" } : {
         title: "", description: "", customer_name: "", customer_phone: "",
         address: "", job_type: "HVAC", assigned_to: "",
-        scheduled_at: "", duration_min: 60, price: 0, status: "unscheduled",
+        scheduled_at: "", end_at: "", duration_min: 60, price: 0, status: "unscheduled",
     });
     const [saving, setSaving] = useState(false);
     const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -164,13 +173,21 @@ function JobModal({ onClose, onSaved, team, initial }) {
         e.preventDefault();
         setSaving(true);
         try {
+            // If user provided an explicit end time, derive duration from start→end.
+            let duration = parseInt(form.duration_min) || 60;
+            if (form.scheduled_at && form.end_at) {
+                const start = new Date(form.scheduled_at).getTime();
+                const end = new Date(form.end_at).getTime();
+                if (end > start) duration = Math.round((end - start) / 60000);
+            }
             const payload = {
                 ...form,
                 price: parseFloat(form.price) || 0,
-                duration_min: parseInt(form.duration_min) || 60,
+                duration_min: duration,
                 assigned_to: form.assigned_to || null,
                 scheduled_at: form.scheduled_at ? new Date(form.scheduled_at).toISOString() : null,
             };
+            delete payload.end_at; // server only stores scheduled_at + duration_min
             if (initial) await api.patch(`/jobs/${initial.id}`, payload);
             else await api.post("/jobs", payload);
             toast.success(initial ? "Job updated" : "Job created");
@@ -183,8 +200,14 @@ function JobModal({ onClose, onSaved, team, initial }) {
     };
 
     const localDt = form.scheduled_at
-        ? new Date(form.scheduled_at).toISOString().slice(0, 16)
+        ? toLocalDt(form.scheduled_at)
         : "";
+    // Derive end-time picker value from start + duration (or stored end_at)
+    const localEndDt = form.end_at
+        ? toLocalDt(form.end_at)
+        : (form.scheduled_at && form.duration_min
+            ? toLocalDt(new Date(new Date(form.scheduled_at).getTime() + (parseInt(form.duration_min) || 60) * 60000).toISOString())
+            : "");
 
     return (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
@@ -238,17 +261,49 @@ function JobModal({ onClose, onSaved, team, initial }) {
                             </select>
                         </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div>
                             <label className="text-xs font-medium">Scheduled</label>
                             <input type="datetime-local" value={localDt}
-                                onChange={(e) => setForm((f) => ({ ...f, scheduled_at: e.target.value ? new Date(e.target.value).toISOString() : "" }))}
+                                onChange={(e) => {
+                                    const v = e.target.value;
+                                    setForm((f) => {
+                                        const startIso = v ? new Date(v).toISOString() : "";
+                                        // Keep the end time relative if we already have one
+                                        let nextDur = f.duration_min;
+                                        if (startIso && f.end_at) {
+                                            const diff = Math.round((new Date(f.end_at).getTime() - new Date(startIso).getTime()) / 60000);
+                                            if (diff > 0) nextDur = diff;
+                                        }
+                                        return { ...f, scheduled_at: startIso, duration_min: nextDur };
+                                    });
+                                }}
                                 data-testid="job-schedule-input"
+                                className="mt-1 w-full border border-slate-300 px-3 py-2" />
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium">Ends</label>
+                            <input type="datetime-local" value={localEndDt}
+                                onChange={(e) => {
+                                    const v = e.target.value;
+                                    setForm((f) => {
+                                        if (!v) return { ...f, end_at: "" };
+                                        const endIso = new Date(v).toISOString();
+                                        let nextDur = f.duration_min;
+                                        if (f.scheduled_at) {
+                                            const diff = Math.round((new Date(endIso).getTime() - new Date(f.scheduled_at).getTime()) / 60000);
+                                            if (diff > 0) nextDur = diff;
+                                        }
+                                        return { ...f, end_at: endIso, duration_min: nextDur };
+                                    });
+                                }}
+                                data-testid="job-end-input"
                                 className="mt-1 w-full border border-slate-300 px-3 py-2" />
                         </div>
                         <div>
                             <label className="text-xs font-medium">Duration (min)</label>
                             <input type="number" min={15} value={form.duration_min} onChange={update("duration_min")}
+                                data-testid="job-duration-input"
                                 className="mt-1 w-full border border-slate-300 px-3 py-2" />
                         </div>
                         <div>
