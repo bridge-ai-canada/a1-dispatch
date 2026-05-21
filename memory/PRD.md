@@ -245,6 +245,25 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - ✅ Mobile signature capture (`react-native-signature-canvas`)
 - ✅ Mobile offline queue (`AsyncStorage` + 20s auto-flush)
 
+### v1.14 — Done (Estimates & Invoicing)
+- ✅ Good / Better / Best proposal builder with featured tier highlighting
+- ✅ Pre-wired Wisetack-style financing service (`financing_service.py`) with local APR/term quote fallback; monthly-payment math (amortized formula)
+- ✅ Full invoice CRUD with line items, tax rate, discount (% or $), deposit (% or $)
+- ✅ Currency math via `Decimal` with `ROUND_HALF_UP` (accounting-correct)
+- ✅ PDF generation for estimates (multi-tier) and invoices (`pdf_service.py`, ReportLab)
+- ✅ Public no-auth proposal page (`/proposal/:token`) — premium homeowner-friendly UI: 3-tier comparison, optional add-ons, sticky CTA, financing CTA, e-signature canvas, IP+UA captured
+- ✅ Public no-auth invoice payment page (`/pay/:token`) — large "Pay $X now" + deposit-only option, Stripe-secure footer
+- ✅ Stripe Checkout for invoice — full / deposit / balance; webhook wires payments into invoice via `handle_invoice_payment`
+- ✅ Convert approved estimate → invoice (selected tier + selected addons), sequential numbering (E-0001, I-0001 per company)
+- ✅ Reusable estimate & invoice templates with builder dropdown
+- ✅ Sidebar nav: Estimates · Invoices · Templates
+- ✅ Backend test coverage: 23/23 pytest cases pass (CRUD, math, send, PDF, public approval/decline, financing-quote, convert flow, Stripe checkout, templates, multi-tenant isolation, webhook hook)
+
+### P1 — Remaining
+- Apple login (needs Apple Developer credentials from user)
+- Twilio SMS (needs credentials)
+- Mapbox/Google fallback for Nominatim 429 rate limiting
+
 ### P2 — Future
 - Apple login (needs Apple Developer credentials)
 - Android login (needs Google Play Developer credentials)

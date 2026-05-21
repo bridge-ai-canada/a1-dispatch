@@ -1,6 +1,12 @@
 """Pydantic models + math helpers for Estimates and Invoices."""
+from decimal import Decimal, ROUND_HALF_UP
 from typing import List, Optional, Literal
 from pydantic import BaseModel, Field
+
+
+def _money(v) -> float:
+    """Round to 2 decimals using accounting-standard half-up."""
+    return float(Decimal(str(v)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
 # -------------------- Line items / shared --------------------
@@ -162,14 +168,14 @@ class CheckoutPortalIn(BaseModel):
 
 # -------------------- Math helpers --------------------
 def _items_subtotal(items: List[dict]) -> float:
-    return round(sum(float(i.get("qty", 0)) * float(i.get("unit_price", 0)) for i in items), 2)
+    return _money(sum(float(i.get("qty", 0)) * float(i.get("unit_price", 0)) for i in items))
 
 
 def _items_taxable_subtotal(items: List[dict]) -> float:
-    return round(sum(
+    return _money(sum(
         float(i.get("qty", 0)) * float(i.get("unit_price", 0))
         for i in items if i.get("taxable", True)
-    ), 2)
+    ))
 
 
 def compute_totals(
@@ -189,27 +195,27 @@ def compute_totals(
     dtype = discount.get("type", "percent")
     dval = float(discount.get("value", 0) or 0)
     if dtype == "percent":
-        discount_amount = round(subtotal * (dval / 100.0), 2)
+        discount_amount = _money(subtotal * (dval / 100.0))
     else:
-        discount_amount = round(min(dval, subtotal), 2)
+        discount_amount = _money(min(dval, subtotal))
 
     # Proportionally reduce taxable amount by the same ratio as the discount applies to subtotal
     if subtotal > 0 and discount_amount > 0:
         ratio = (subtotal - discount_amount) / subtotal
-        taxable_after = round(taxable * ratio, 2)
+        taxable_after = _money(taxable * ratio)
     else:
         taxable_after = taxable
 
-    tax_amount = round(taxable_after * (float(tax_rate or 0) / 100.0), 2)
-    total = round(subtotal - discount_amount + tax_amount, 2)
+    tax_amount = _money(taxable_after * (float(tax_rate or 0) / 100.0))
+    total = _money(subtotal - discount_amount + tax_amount)
 
     deposit = deposit or {}
     dep_type = deposit.get("type", "none")
     dep_val = float(deposit.get("value", 0) or 0)
     if dep_type == "percent":
-        deposit_amount = round(total * (dep_val / 100.0), 2)
+        deposit_amount = _money(total * (dep_val / 100.0))
     elif dep_type == "fixed":
-        deposit_amount = round(min(dep_val, total), 2)
+        deposit_amount = _money(min(dep_val, total))
     else:
         deposit_amount = 0.0
 
