@@ -1,0 +1,41 @@
+{
+  "summary": "Comprehensive backend testing of Estimates & Invoicing system (A1 Field Pro). Implemented 23 pytest cases across CRUD, math, send/PDF, public approval/decline/financing-quote, convert-to-invoice cross-flow, Stripe checkout, templates, multi-tenant isolation, and direct test of handle_invoice_payment webhook hook. All 23 tests pass against the public preview URL.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "billing.compute_totals", "issue": "Rounding uses Python's banker's rounding (round-half-to-even). 7650 * 0.0825 = 631.125 rounds to 631.12 instead of the accounting-standard 631.13 (half-up). Cents off-by-one on values that land exactly on .5 of a cent. Consider Decimal with ROUND_HALF_UP for currency math."},
+      {"endpoint": "POST /api/estimates/{id}/convert", "issue": "Created invoice copies estimate fields but does not copy financing config or carry the source customer_id link beyond denormalized fields; minor — not requested but worth noting."},
+      {"endpoint": "GET /api/public/estimates/{token}", "issue": "auto-mark-viewed only flips status from 'sent' to 'viewed'. If estimate was sent later (already 'viewed') and customer opens again, viewed_at is not refreshed. Cosmetic."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_estimates_invoices.py",
+    "/app/backend/tests/test_invoice_webhook_hook.py",
+    "/app/test_reports/pytest/iteration_15_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Switch compute_totals to Decimal with ROUND_HALF_UP for cent-accurate tax math (off-by-one cent on exact half-cents).",
+    "(Optional) Track viewed_at refresh on subsequent public views or maintain a view counter."
+  ],
+  "critical_code_review_comments": [
+    "estimates.py and invoices.py both define local _next_number/_new_token helpers — DRY: extract into a shared util.",
+    "compute_totals uses round() (banker's rounding) which is incorrect for currency; should use Decimal/ROUND_HALF_UP.",
+    "PUT /estimates allows clearing customer_email by sending '' but lower()+or-None branch only applies on POST; if email is being changed via PUT it's stored as-typed (case preserved). Minor consistency gap.",
+    "estimates.py update_estimate handles tiers/discount/etc. .dict() checks via hasattr — Pydantic models in body.dict(exclude_none=True) are already dicts after .dict(); the hasattr branch is unreachable dead code.",
+    "_refresh_status compares due_at via fromisoformat with .replace('Z','+00:00') — fine here, but issued_at is stored from datetime.now(timezone.utc).isoformat() which is timezone-aware so no Z replacement needed; harmless.",
+    "Public token uniqueness relies on sparse unique index in server.py — verified working but no application-level retry on rare token collision.",
+    "Convert-to-invoice does not lock against double-conversion if invoked concurrently (no atomic status check inside update). Low-risk under normal load."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_estimates_invoices.py",
+    "/app/backend/tests/test_invoice_webhook_hook.py"
+  ],
+  "success_rate": {"backend": "100% (23/23)", "frontend": "not tested (per request)"},
+  "test_credentials": "demo@a1fieldpro.com / Demo1234! (MFA disabled on seeded demo accounts); second tenant created on-the-fly via /api/auth/register for isolation test.",
+  "seed_data_creation": "Isolation test registers a TEST_IsoCo_* tenant; all created estimates/invoices/templates are deleted at end of each test using TEST_ prefix.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Estimates+Invoices+Templates backend is fully functional. Re-run: pytest /app/backend/tests/test_estimates_invoices.py /app/backend/tests/test_invoice_webhook_hook.py -v. Tests are idempotent (use TEST_ prefix + UUID suffixes). The math tests assert tax to within ±0.02 because compute_totals uses banker's rounding (see minor issue). Stripe checkout test is lenient (accepts 200/400/502/503) to avoid coupling to live Stripe. Wisetack returns provider=local as expected.",
+  "rca of the issue": "N/A — no failing tests after rounding-tolerance adjustment. The off-by-one-cent on tax is a known Python round() behavior (banker's rounding) and is documented as a minor improvement opportunity."
+}

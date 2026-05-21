@@ -83,6 +83,13 @@ async def payment_status(session_id: str, request: Request, user: dict = Depends
     }
     await db.payment_transactions.update_one({"session_id": session_id}, {"$set": updates})
     if status.payment_status == "paid" and not tx.get("processed"):
+        if tx.get("type") == "invoice":
+            from routers.invoices import handle_invoice_payment
+            await handle_invoice_payment(tx)
+            await db.payment_transactions.update_one(
+                {"session_id": session_id}, {"$set": {"processed": True}}
+            )
+            return await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
         await db.jobs.update_one(
             {"id": tx["job_id"], "company_id": user["company_id"]},
             {"$set": {"paid": True, "status": "completed", "paid_at": now_iso()}},
@@ -130,6 +137,14 @@ async def stripe_webhook(request: Request):
         if evt.payment_status == "paid":
             tx = await db.payment_transactions.find_one({"session_id": evt.session_id})
             if tx and not tx.get("processed"):
+                # New: invoice payments
+                if tx.get("type") == "invoice":
+                    from routers.invoices import handle_invoice_payment
+                    await handle_invoice_payment(tx)
+                    await db.payment_transactions.update_one(
+                        {"session_id": evt.session_id}, {"$set": {"processed": True}}
+                    )
+                    return {"received": True}
                 if tx.get("type") == "tip":
                     await db.jobs.update_one(
                         {"id": tx["job_id"]},

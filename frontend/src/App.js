@@ -29,6 +29,15 @@ import RecurringJobs from "./pages/RecurringJobs";
 import Reports from "./pages/Reports";
 import Dispatch from "./pages/Dispatch";
 import NotificationPrefs from "./pages/NotificationPrefs";
+import Estimates from "./pages/Estimates";
+import EstimateBuilder from "./pages/EstimateBuilder";
+import EstimateDetail from "./pages/EstimateDetail";
+import Invoices from "./pages/Invoices";
+import InvoiceBuilder from "./pages/InvoiceBuilder";
+import InvoiceDetail from "./pages/InvoiceDetail";
+import Templates from "./pages/Templates";
+import PublicEstimate from "./pages/PublicEstimate";
+import PublicInvoice from "./pages/PublicInvoice";
 
 function HashGuard({ children }) {
     // Per Emergent Auth playbook: detect session_id synchronously during render
@@ -63,6 +72,8 @@ function App() {
                     <Route path="/portal" element={<Portal />} />
                     <Route path="/payment/result" element={<PaymentResult />} />
                     <Route path="/book/:companyId" element={<BookingWidget />} />
+                    <Route path="/proposal/:token" element={<PublicEstimate />} />
+                    <Route path="/pay/:token" element={<PublicInvoice />} />
 
                     <Route
                         path="/app"
@@ -87,6 +98,15 @@ function App() {
                         <Route path="recurring" element={<RecurringJobs />} />
                         <Route path="reports" element={<Reports />} />
                         <Route path="dispatch" element={<Dispatch />} />
+                        <Route path="estimates" element={<Estimates />} />
+                        <Route path="estimates/new" element={<EstimateBuilder />} />
+                        <Route path="estimates/:id" element={<EstimateDetail />} />
+                        <Route path="estimates/:id/edit" element={<EstimateBuilder />} />
+                        <Route path="invoices" element={<Invoices />} />
+                        <Route path="invoices/new" element={<InvoiceBuilder />} />
+                        <Route path="invoices/:id" element={<InvoiceDetail />} />
+                        <Route path="invoices/:id/edit" element={<InvoiceBuilder />} />
+                        <Route path="templates" element={<Templates />} />
                         <Route path="notifications" element={<NotificationPrefs />} />
                     </Route>
 

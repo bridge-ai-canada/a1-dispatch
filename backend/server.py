@@ -12,7 +12,7 @@ from deps import (
     init_storage,
     hash_password, verify_password,
 )
-from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard
+from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates
 
 app = FastAPI(title="A1 Field Pro API")
 api = APIRouter(prefix="/api")
@@ -31,6 +31,9 @@ api.include_router(routes_opt.router)
 api.include_router(push.router)
 api.include_router(dispatch.router)
 api.include_router(dashboard.router)
+api.include_router(estimates.router)
+api.include_router(invoices.router)
+api.include_router(proposal_templates.router)
 
 
 @api.get("/")
@@ -58,6 +61,14 @@ async def startup():
     await db.push_subscriptions.create_index("user_id")
     await db.push_subscriptions.create_index("endpoint", unique=True)
     await db.geocode_cache.create_index("address", unique=True)
+    await db.estimates.create_index([("company_id", 1), ("status", 1)])
+    await db.estimates.create_index("public_token", unique=True, sparse=True)
+    await db.estimates.create_index([("company_id", 1), ("number", 1)])
+    await db.invoices.create_index([("company_id", 1), ("status", 1)])
+    await db.invoices.create_index("public_token", unique=True, sparse=True)
+    await db.invoices.create_index([("company_id", 1), ("number", 1)])
+    await db.proposal_templates.create_index([("company_id", 1), ("kind", 1)])
+    await db.counters.create_index([("company_id", 1), ("kind", 1)], unique=True)
     await seed_demo()
 
 
