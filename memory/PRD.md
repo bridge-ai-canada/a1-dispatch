@@ -350,6 +350,18 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - ✅ **BrandingSettings sidebar** now surfaces the tenant's branded-landing URL with copy + open-in-new-tab button. Clipboard writes wrapped in try/catch + `execCommand` fallback to avoid sandbox-iframe overlay errors.
 - ✅ Iteration 21 retest: backend 6/6 + frontend 100% on targeted flows.
 
+### Feb 2026 — Iteration 22 — Fresh Cash Finance System
+- ✅ **Decisioning engine** (`/app/backend/fresh_cash_service.py`): APR ladder (excellent 6.99% / good 9.99% / fair 14.99% / subprime 19.99% / declined), DTI limit 0.45, deterministic mock `MockBureauAdapter` keyed off `fico_bucket` field. `RealBureauAdapter` stubbed and env-gated (set `CREDIT_BUREAU_PROVIDER`/`API_KEY`/`BASE_URL` to wire real bureau). Amortization schedule + monthly_payment + total_finance_charge math.
+- ✅ **Customer portal** (`/finance/:token` — public, no auth) — 4-step wizard: Apply (FICO bucket + income + obligations + consent) → Decision (approved/counter_offer/manual_review/declined) → Sign (SignaturePad + typed name) → Done. Tenant-branded (uses public/branding for colors/logo).
+- ✅ **Contractor dashboard** (`/app/financing`) — 4 metric tiles (Total funded / Pending volume / Buy-down fees / Active rentals), 5 pipeline chips, Applications tab with copy-public-link + buy-down button, Rentals tab, calculator modal with amortization table, new-application + new-rental modals.
+- ✅ **Admin dashboard** (`/app/admin/financing`, super_admin) — platform metrics (total funded, funding events, by-status, by-tier), per-app override modal (change decision/APR/term).
+- ✅ **Buy-down marketplace**: `POST /api/financing/buydown/quote` + `POST /api/financing/buydown` — contractor pays X% fee → customer APR drops X×0.5 points. Mutates the offer + creates `finance_buydowns` ledger row.
+- ✅ **Funding events**: `POST /api/financing/funding-events` (ledger-only). `kind=disbursement` on a signed app auto-advances to `funded`.
+- ✅ **Rental equipment financing**: `POST/GET /api/financing/rentals` — auto-derives weekly ↔ monthly payment, tracks `balance_remaining`.
+- ✅ **Estimate integration**: New `POST /api/public/estimates/{token}/finance` creates a Fresh Cash application from a public estimate's tier total; idempotent. PublicEstimate has a "Pay monthly with Fresh Cash" CTA that redirects to `/finance/<token>`.
+- ✅ **6 new tenant-scoped collections** with indexes: finance_applications (public_token unique), finance_contracts, finance_buydowns, finance_funding_events, finance_rentals.
+- ✅ Backend 19/19 financing endpoints + frontend 100% on customer wizard + contractor dashboard (iteration 22). `retest_needed=False`.
+
 ### P1 — Remaining
 - Stripe Price IDs (`STRIPE_PRICE_STARTER`, `STRIPE_PRICE_LITE`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_ENTERPRISE`) for real billing — currently dev-mode flips plan locally.
 - Twilio SMS — backend wired & gated, awaiting credentials.
