@@ -6,7 +6,7 @@ import {
     AddressBook, GearSix, SignOut, List, X, DeviceMobile,
     ShieldCheck, ClockCounterClockwise, Buildings, EnvelopeSimple,
     ArrowsClockwise, ChartLine, Broadcast, FileText, Receipt, Stack, Sparkle,
-    Kanban, PaintBrush, ChatText, CreditCard, Key, Globe,
+    Kanban, PaintBrush, ChatText, CreditCard, Key, Globe, Bank,
 } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import api from "../lib/api";
@@ -24,6 +24,8 @@ const baseNav = [
     { to: "/app/estimates", label: "Estimates", icon: FileText, roles: ["owner","dispatcher","office_manager","csr","sales_rep","accountant"] },
     { to: "/app/invoices", label: "Invoices", icon: Receipt, roles: ["owner","dispatcher","office_manager","accountant"] },
     { to: "/app/templates", label: "Templates", icon: Stack, roles: ["owner","office_manager"] },
+    { to: "/app/financing", label: "Financing", icon: Bank, roles: ["owner","dispatcher","office_manager","sales_rep","csr","accountant"] },
+    { to: "/app/admin/financing", label: "Finance admin", icon: Bank, roles: ["super_admin"] },
     { to: "/app/ai", label: "AI Assistant", icon: Sparkle, roles: ["owner","dispatcher","office_manager"] },
     { to: "/app/my-jobs", label: "My Jobs", icon: DeviceMobile, roles: ["owner","dispatcher","technician"] },
     { to: "/app/recurring", label: "Recurring", icon: ArrowsClockwise, roles: ["owner","dispatcher","office_manager"] },

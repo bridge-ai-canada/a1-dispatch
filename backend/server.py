@@ -12,7 +12,7 @@ from deps import (
     init_storage,
     hash_password, verify_password,
 )
-from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates, timesheets, checklists, materials, ai, sms, branding, branches, msg_templates, subscription, tenants, api_keys
+from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates, timesheets, checklists, materials, ai, sms, branding, branches, msg_templates, subscription, tenants, api_keys, financing
 
 app = FastAPI(title="A1 Field Pro API")
 api = APIRouter(prefix="/api")
@@ -45,6 +45,7 @@ api.include_router(msg_templates.router)
 api.include_router(subscription.router)
 api.include_router(tenants.router)
 api.include_router(api_keys.router)
+api.include_router(financing.router)
 
 
 @api.get("/")
@@ -99,6 +100,13 @@ async def startup():
     await db.api_keys.create_index("hash", unique=True, sparse=True)
     await db.api_keys.create_index([("company_id", 1), ("active", 1)])
     await db.subscription_checkouts.create_index("session_id", unique=True)
+    await db.finance_applications.create_index([("company_id", 1), ("status", 1)])
+    await db.finance_applications.create_index("public_token", unique=True, sparse=True)
+    await db.finance_applications.create_index([("company_id", 1), ("created_at", -1)])
+    await db.finance_contracts.create_index([("company_id", 1), ("created_at", -1)])
+    await db.finance_buydowns.create_index([("company_id", 1), ("created_at", -1)])
+    await db.finance_funding_events.create_index([("company_id", 1), ("created_at", -1)])
+    await db.finance_rentals.create_index([("company_id", 1), ("status", 1)])
     # one-time migration: legacy "scheduled" status -> "scheduled_installation"
     await db.jobs.update_many(
         {"status": "scheduled"},

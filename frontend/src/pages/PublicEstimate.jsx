@@ -293,6 +293,19 @@ export default function PublicEstimate() {
                                     <CreditCard size={16}/> Apply for financing
                                 </a>
                             )}
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        const { data: r } = await axios.post(`${API}/public/estimates/${token}/finance`, { selected_tier: selectedTier });
+                                        window.location.href = `/finance/${r.public_token}`;
+                                    } catch (e) {
+                                        toast.error(e.response?.data?.detail || "Could not start financing");
+                                    }
+                                }}
+                                className="px-4 py-3 rounded-xl border-2 border-violet-300 bg-violet-50 hover:bg-violet-100 text-violet-800 font-bold text-sm inline-flex items-center gap-2"
+                                data-testid="public-fresh-cash-btn">
+                                <CreditCard size={16}/> Pay monthly with Fresh Cash
+                            </button>
                             <button onClick={() => setShowApprove(true)}
                                 className="px-6 py-3 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-sm shadow-md inline-flex items-center gap-2"
                                 data-testid="public-approve-button">
