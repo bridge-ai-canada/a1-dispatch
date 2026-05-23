@@ -1,0 +1,31 @@
+{
+  "summary": "Iteration 21 retest of branding fixes from iteration 20. All 5 acceptance criteria PASS: (1) GET /api/public/branding now returns logo_url and favicon_url fields (verified for demo company). (2) GET /api/public/branding/asset/<company>/logo returns 200 image bytes with no auth, /evil kind -> 404, unknown company -> 404. (3) /site/<demoId> tenant landing page now loads the logo image successfully via the new public asset endpoint (img.complete=true, no 401, no broken-image icon). (4) BrandingSettings copy-landing-url click no longer produces an Uncaught runtime error overlay or any console/page error; success toast 'Landing URL copied' still shows. (5) Pricing page still renders 4 plan cards (Starter/Lite/Pro/Enterprise) with monthly/annual toggle; Branches page still loads with full sidebar nav.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/site/<demo company> tenant landing", "issues": ["Demo company's seeded logo is a 1x1 transparent PNG placeholder (68 bytes). The image element loads correctly (no 401, no broken-image icon — bug from iteration 20 is fixed) but is visually invisible. Not a code defect; just seed/UAT data. To see a real logo, upload a real PNG via /app/settings/branding -> Logo & Favicon -> Upload."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_public_branding.py", "/app/test_reports/pytest/iteration_21.xml"],
+  "action_items": [
+    "Optional: replace the 1x1 placeholder demo logo in the seed with a real A1 Field Pro logo so the demo landing page visually shows branding (purely cosmetic; not a bug)."
+  ],
+  "critical_code_review_comments": [
+    "branding.py public_branding_asset: path-prefix validation (a1fieldpro/{company_id}/branding/) is correctly enforced — defense-in-depth against path traversal. Good.",
+    "branding.py exposes logo_path and favicon_path raw storage paths in the public response alongside logo_url/favicon_url — consider removing the raw *_path fields from the public payload since callers should only use the URL (minor info-disclosure tidy-up, not a security hole).",
+    "BrandingSettings.jsx copy() now uses try/catch with execCommand fallback — correctly suppresses unhandled-rejection overlay in sandboxed iframes. Verified."
+  ],
+  "updated_files": ["/app/backend/tests/test_public_branding.py"],
+  "success_rate": {"backend": "100% (6/6 pytest)", "frontend": "100% on targeted flows"},
+  "test_credentials": "demo@a1fieldpro.com / Demo1234! (owner). Demo company_id = 8036dcfb-682a-4142-8b91-9ee19529eb09.",
+  "seed_data_creation": "None — used existing demo company seed (already has a 1x1 placeholder logo uploaded).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Both iteration-20 bugs are fully resolved. Public branding asset endpoint at /api/public/branding/asset/{company_id}/{kind} works correctly (kind in [logo, favicon] only; otherwise 404). The demo company logo is a 1x1 px placeholder — not a bug. Backend pytest file at /app/backend/tests/test_public_branding.py covers all new endpoints and can be reused.",
+  "rca of the issue": "N/A — verifying fixes, not finding new issues. Iter-20 logo bug RCA was: TenantLanding built /api/files/<path> URLs (auth-gated) on a public page; fix added an unauthenticated /api/public/branding/asset/{company_id}/{kind} streaming endpoint with path-prefix validation, and the public branding response now exposes logo_url/favicon_url for the frontend to consume directly."
+}

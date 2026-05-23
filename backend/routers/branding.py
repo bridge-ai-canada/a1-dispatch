@@ -1,10 +1,10 @@
 """Branding: company white-label settings (logo, colors, app name, domain) + public lookup."""
 import uuid
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Response
 
 from deps import (
     db, now_iso, APP_NAME,
-    put_object, get_current_user, require_role, log_activity,
+    put_object, get_object, get_current_user, require_role, log_activity,
     BrandingIn,
 )
 
@@ -115,6 +115,9 @@ async def public_branding(domain: str = "", company_id: str = ""):
     if not company:
         raise HTTPException(status_code=404, detail="Not found")
     b = company.get("branding") or {}
+    # Build absolute public URLs for branding assets so unauthenticated landing pages can show them.
+    logo_url = f"/api/public/branding/asset/{company['id']}/logo" if b.get("logo_path") else None
+    favicon_url = f"/api/public/branding/asset/{company['id']}/favicon" if b.get("favicon_path") else None
     return {
         "company_id": company["id"],
         "company_name": company.get("name", ""),
@@ -124,7 +127,30 @@ async def public_branding(domain: str = "", company_id: str = ""):
         "secondary_color": b.get("secondary_color") or "#0F172A",
         "logo_path": b.get("logo_path"),
         "favicon_path": b.get("favicon_path"),
+        "logo_url": logo_url,
+        "favicon_url": favicon_url,
         "tagline": b.get("tagline") or "",
         "support_email": b.get("support_email"),
         "support_phone": b.get("support_phone"),
     }
+
+
+@router.get("/public/branding/asset/{company_id}/{kind}")
+async def public_branding_asset(company_id: str, kind: str):
+    """Serve a tenant's logo or favicon WITHOUT auth — only the two whitelisted asset kinds."""
+    if kind not in ("logo", "favicon"):
+        raise HTTPException(status_code=404, detail="Unknown asset")
+    company = await db.companies.find_one(
+        {"id": company_id}, {"_id": 0, "branding": 1},
+    )
+    if not company:
+        raise HTTPException(status_code=404, detail="Not found")
+    path = (company.get("branding") or {}).get(f"{kind}_path")
+    if not path:
+        raise HTTPException(status_code=404, detail=f"No {kind} set for this tenant")
+    # Defense in depth: paths are stored as `${APP_NAME}/<company_id>/branding/<kind>-<uuid>.<ext>`
+    # — only serve paths that match this tenant.
+    if not path.startswith(f"{APP_NAME}/{company_id}/branding/"):
+        raise HTTPException(status_code=403, detail="Asset not eligible for public serving")
+    data, ctype = get_object(path)
+    return Response(content=data, media_type=ctype, headers={"Cache-Control": "public, max-age=3600"})

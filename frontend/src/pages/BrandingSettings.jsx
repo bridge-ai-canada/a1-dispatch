@@ -94,10 +94,21 @@ export default function BrandingSettings() {
         finally { setSaving(false); }
     };
 
-    const copy = (txt, label) => { navigator.clipboard.writeText(txt); setCopied(label); toast.success(`${label} copied`); setTimeout(() => setCopied(""), 1500); };
+    const copy = (txt, label) => {
+        try {
+            navigator.clipboard.writeText(txt).catch(() => {
+                // Fallback for sandboxed iframes / older browsers
+                const ta = document.createElement("textarea"); ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0";
+                document.body.appendChild(ta); ta.select();
+                try { document.execCommand("copy"); } catch (_) {}
+                document.body.removeChild(ta);
+            });
+        } catch (_) {}
+        setCopied(label); toast.success(`${label} copied`); setTimeout(() => setCopied(""), 1500);
+    };
 
-    const logoUrl = form.logo_path ? `${API_BASE.replace("/api","")}/api/files/${encodeURIComponent(form.logo_path)}` : "";
-    const faviconUrl = form.favicon_path ? `${API_BASE.replace("/api","")}/api/files/${encodeURIComponent(form.favicon_path)}` : "";
+    const logoUrl = form.logo_path ? `${API_BASE.replace("/api","")}/api/public/branding/asset/${company?.id || ''}/logo?v=${encodeURIComponent(form.logo_path)}` : "";
+    const faviconUrl = form.favicon_path ? `${API_BASE.replace("/api","")}/api/public/branding/asset/${company?.id || ''}/favicon?v=${encodeURIComponent(form.favicon_path)}` : "";
 
     return (
         <div className="space-y-6 max-w-6xl">

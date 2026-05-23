@@ -28,11 +28,11 @@ export default function TenantLanding() {
     useEffect(() => {
         if (brand?.app_name) document.title = brand.app_name;
         // Inject favicon if provided
-        if (brand?.favicon_path) {
+        if (brand?.favicon_url) {
             const link = document.querySelector("link[rel*='icon']") || document.createElement("link");
             link.type = "image/png";
             link.rel = "shortcut icon";
-            link.href = `${API_BASE.replace("/api","")}/api/files/${encodeURIComponent(brand.favicon_path)}`;
+            link.href = `${API_BASE.replace("/api","")}${brand.favicon_url}`;
             document.head.appendChild(link);
         }
     }, [brand]);
@@ -55,7 +55,7 @@ export default function TenantLanding() {
     const primary = brand.primary_color || "#1D4ED8";
     const accent = brand.accent_color || "#DC2626";
     const secondary = brand.secondary_color || "#0F172A";
-    const logoUrl = brand.logo_path ? `${API_BASE.replace("/api","")}/api/files/${encodeURIComponent(brand.logo_path)}` : "";
+    const logoUrl = brand.logo_url ? `${API_BASE.replace("/api","")}${brand.logo_url}` : "";
     const bookingUrl = `/book/${brand.company_id}`;
 
     return (
