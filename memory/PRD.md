@@ -259,6 +259,23 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - ✅ Sidebar nav: Estimates · Invoices · Templates
 - ✅ Backend test coverage: 23/23 pytest cases pass
 
+### v1.17 — Done (AI Integration)
+- ✅ **8 AI features** live across the platform, powered by OpenAI via Emergent Universal LLM Key (gpt-4o / gpt-4o-mini)
+  - **Estimate generator** — "✨ Generate with AI" on Estimate Builder → 3 G/B/B tiers from a prompt
+  - **Call summaries** — structured JSON (intent, sentiment, action_items, next_step); auto-logs to customer comms
+  - **Dispatcher assistant** — floating chat panel on the Dispatch page; multi-turn with session_id
+  - **Tech notes polish** — inline button on JobDetail notes section
+  - **Job summaries** — auto-generate invoice-ready paragraph from materials + checklist + voice notes
+  - **Upsell recommendations** — contextual chip on each job ({title, reason, suggested_price, confidence})
+  - **Maintenance scanner** — bulk customer scan → surfaces who's due for recurring service
+  - **Customer chatbot** — hybrid sales+support widget on public Booking + Proposal pages, with session persistence
+- ✅ `ai_logs` audit trail for every call (feature, model, tokens-in/out, success/error)
+- ✅ `maintenance_suggestions` and `chatbot_messages` collections with indexes
+- ✅ "AI Assistant" sidebar nav → new `/app/ai` page with Overview · Maintenance · Activity log tabs
+- ✅ Logo refresh — new orange gear "A1fieldpro" branding across Layout, login, and emails
+- ✅ Backend tests: **20/20 AI endpoint tests pass** (estimate gen, call summary, polish, job summary, upsell, maintenance scan/list/dismiss, dispatcher, chatbot, logs, auth + tenant isolation)
+- ✅ Production hardening: `dismiss_maintenance` now returns 404 on missing id (tenant isolation)
+
 ### v1.16 — Done (Pipeline statuses)
 - ✅ Added **Won bid**, **Lost bid**, **On hold** statuses
 - ✅ Renamed **Scheduled** → **Scheduled installation**

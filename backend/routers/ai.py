@@ -197,10 +197,12 @@ async def list_maintenance(user: dict = Depends(get_current_user)):
 
 @router.post("/ai/maintenance/{sid}/dismiss")
 async def dismiss_maintenance(sid: str, user: dict = Depends(get_current_user)):
-    await db.maintenance_suggestions.update_one(
+    res = await db.maintenance_suggestions.update_one(
         {"id": sid, "company_id": user["company_id"]},
         {"$set": {"status": "dismissed", "dismissed_at": now_iso()}},
     )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
     return {"ok": True}
 
 
