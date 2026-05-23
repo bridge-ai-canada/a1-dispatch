@@ -12,7 +12,7 @@ from deps import (
     init_storage,
     hash_password, verify_password,
 )
-from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates, timesheets, checklists, materials, ai, sms, branding, branches, msg_templates, subscription, tenants, api_keys, financing
+from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates, timesheets, checklists, materials, ai, sms, branding, branches, msg_templates, subscription, tenants, api_keys, financing, analytics
 
 app = FastAPI(title="A1 Field Pro API")
 api = APIRouter(prefix="/api")
@@ -46,6 +46,7 @@ api.include_router(subscription.router)
 api.include_router(tenants.router)
 api.include_router(api_keys.router)
 api.include_router(financing.router)
+api.include_router(analytics.router)
 
 
 @api.get("/")
