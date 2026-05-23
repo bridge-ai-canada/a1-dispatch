@@ -329,17 +329,38 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - ✅ Geocoding refactored — Mapbox primary (when `MAPBOX_ACCESS_TOKEN` set) → Google fallback → Nominatim
 - ✅ All 17/17 iteration 18 pytest cases pass; no regressions in SMS/geocode/pipeline paths
 
+### Feb 2026 — Iteration 19 — White-Label SaaS System
+- ✅ **Branding** (`routers/branding.py`, `pages/BrandingSettings.jsx`): logos, favicons, primary/accent/secondary colors with 6 presets, app name, tagline, custom domain (stored + DNS instructions), support email/phone, invoice footer, email "from" name, branding audit log, public unauthenticated lookup via `GET /api/public/branding?domain=…|company_id=…`. Branding applied app-wide via CSS variables in AuthContext.
+- ✅ **Branches** (`routers/branches.py`, `pages/Branches.jsx`): per-company sub-locations CRUD, per-branch metrics, plan-gated to Pro/Enterprise (402).
+- ✅ **Franchises** (super_admin): parent-of-companies grouping with cross-tenant rollup metrics.
+- ✅ **Message templates** (`routers/msg_templates.py`, `pages/MessageTemplates.jsx`): 7 system defaults auto-seeded per tenant, $variable substitution via string.Template.safe_substitute, live preview with sample data, variable picker UI. System defaults are toggle-able but not deletable.
+- ✅ **Subscription** (`routers/subscription.py`, `pages/Subscription.jsx`): 4 plans — Starter $120 / Lite $220 / Pro $360 / Enterprise $899 — with feature flags (ai_assist, branches, custom_domain, franchise, api_access). Stripe Checkout wired (env-gated `STRIPE_PRICE_<PLAN>`), dev-mode fallback flips plan locally when prices not configured. Super-admin override at `PATCH /api/subscription/admin/{company_id}`.
+- ✅ **Per-tenant API Keys** (`routers/api_keys.py`, `pages/ApiKeys.jsx`): Pro/Enterprise feature. SHA256-hashed `afp_live_<token>` keys, plaintext returned ONCE, revocable, last-used tracking.
+- ✅ **Tenant management** (`routers/tenants.py`, `pages/SuperTenants.jsx`): super-admin platform-wide view with MRR/ARR, suspend, hard delete (purges 22 collections), JSON data export (password_hash + mfa_secret stripped).
+- ✅ **Plan catalog** (`whitelabel_service.py`): single source of truth for plans, default branding, default templates, feature flag helpers (`has_feature(plan, "branches")`), 16 template variables, `render_template` / `find_variables`.
+- ✅ **Multi-tenant indexes**: `branding.custom_domain` unique sparse, `subscription.plan`, `parent_franchise_id`, `message_templates(company_id, key)` unique, `api_keys.hash` unique sparse.
+- ✅ Sidebar nav: Branding, Branches, Messages, Subscription, API keys (owner+), Tenants (super_admin).
+- ✅ Startup migration: existing companies default-seeded to Starter plan; demo company promoted to Pro.
+- ✅ Backend 37/37 pytest cases pass + frontend 5/5 pages smoke-passed (iteration 19).
+
+### P1 — Remaining
+- Stripe Price IDs (`STRIPE_PRICE_STARTER`, `STRIPE_PRICE_LITE`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_ENTERPRISE`) for real billing — currently dev-mode flips plan locally.
+- Twilio SMS — backend wired & gated, awaiting credentials.
+- Mapbox/Google fallback for Nominatim 429 — wired, awaiting `MAPBOX_ACCESS_TOKEN` or `GOOGLE_MAPS_API_KEY`.
+- Apple login (needs Apple Developer credentials).
+
 ### P2 — Future
-- Apple login (needs Apple Developer credentials)
 - Android login (needs Google Play Developer credentials)
-- Geocoding (Nominatim free or Mapbox) so customer addresses get pinned on the dispatch map automatically
-- SMS notifications (Twilio — needs credentials)
 - Booking-confirmation email back to customers
-- Mobile app — wire Expo Notifications (FCM/APNs), camera photo upload, signature capture, offline queue
-- Tech leaderboard on dashboard (top-rated by 30d avg + tips)
+- Mobile app — wire Expo Notifications (FCM/APNs)
+- Tech leaderboard on dashboard
 - 30-day recurring-revenue forecast widget
 - Per-user notification preferences (toggle per event class + quiet hours)
 - WS heartbeat / ping-pong for ultra-long sessions through aggressive ingress idle-kill
+- Per-branch dashboards drill-down + branch-scoped technician routing
+- Custom invoice PDF templates (e.g. Good/Better/Best layouts) per tenant
+- Webhook subscriptions per tenant (companion to API keys)
+- Tenant-scoped audit log search UI (system + branding + subscription events)
 
 ## Demo credentials
 Owner: `demo@a1fieldpro.com` / `Demo1234!`
