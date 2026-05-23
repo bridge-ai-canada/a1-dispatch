@@ -1,0 +1,31 @@
+{
+  "summary": "Frontend-only testing of Pricing page (/pricing), public tenant landing (/site/:companyId, /site?domain=, /site fallback), and BrandingSettings landing-url card. Pricing page fully passes: 4 plan cards with correct prices, featured Pro card, billing toggle (annual = -15%), compare table all 7 features, FAQ 4 accordions, all CTAs link to /register, landing nav Pricing link routes correctly. Tenant landing fully passes for known company_id including tagline, app_name, support_phone, all CTAs -> /book/<companyId>, 4 service cards, contact phone/mail links, footer with company name, inline brand colors. Error states for /site (no params), /site?domain=unknown, /site/unknown-id all render the friendly 'not found' UI. BrandingSettings card shows /site/<id> URL, copy button works (success toast), Open landing link opens in new tab.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "TenantLanding", "issue": "Tenant logo image fails to load (HTTP 401) on the PUBLIC /site/:companyId page because logo URL is built as /api/files/<path>, which is auth-protected. Public landing therefore can never display the tenant logo — falls back to broken image icon. Verified: curl /api/files/<logo_path> -> 401 without auth.", "selector": "[data-testid='tenant-brand'] img", "priority": "MEDIUM"},
+      {"component": "BrandingSettings copy buttons", "issue": "navigator.clipboard.writeText is called without .catch — in sandboxed iframe previews the rejected promise surfaces as an 'Uncaught runtime error' overlay (NotAllowedError). Toast still shows so behavior is fine in normal browsers, but the dev overlay is noisy in preview env.", "selector": "[data-testid='copy-landing-url'], [data-testid='copy-booking-url']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Expose tenant brand assets (logo, favicon) publicly. Options: (a) add a /api/public/files/{path} route gated by company-scoped check, (b) return absolute public URLs from /api/public/branding instead of raw storage paths, or (c) include logo as base64 in the public branding response. Without this fix the public white-label landing page cannot display tenant logos.",
+    "Wrap clipboard.writeText calls in BrandingSettings (copy = ...) with try/catch or .catch fallback to suppress unhandled rejection overlay in sandboxed previews."
+  ],
+  "critical_code_review_comments": [
+    "TenantLanding.jsx line 35 + 58: building auth-protected /api/files URLs for use on an unauthenticated public page is a design mismatch; favicon injection has the same issue.",
+    "BrandingSettings.jsx line 97: clipboard.writeText is fire-and-forget; promise rejection is uncaught."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per request)", "frontend": "95% (Pricing 100%, TenantLanding 95% — logo image broken, BrandingSettings card 100% functional)"},
+  "test_credentials": "demo@a1fieldpro.com / Demo1234! (owner). Demo company_id = 8036dcfb-682a-4142-8b91-9ee19529eb09.",
+  "seed_data_creation": "None — used existing demo company seed.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend public endpoints already verified by main agent (plans, public/branding). Use companyId 8036dcfb-682a-4142-8b91-9ee19529eb09 for /site testing. Login response token key is 'token' (not access_token). For the logo bug, /api/files/{path} returns 401 without auth — that is the root cause of broken logo on the public page."
+}

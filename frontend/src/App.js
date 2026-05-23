@@ -46,6 +46,8 @@ import MessageTemplates from "./pages/MessageTemplates";
 import Subscription from "./pages/Subscription";
 import SuperTenants from "./pages/SuperTenants";
 import ApiKeys from "./pages/ApiKeys";
+import Pricing from "./pages/Pricing";
+import TenantLanding from "./pages/TenantLanding";
 
 function HashGuard({ children }) {
     // Per Emergent Auth playbook: detect session_id synchronously during render
@@ -82,6 +84,9 @@ function App() {
                     <Route path="/book/:companyId" element={<BookingWidget />} />
                     <Route path="/proposal/:token" element={<PublicEstimate />} />
                     <Route path="/pay/:token" element={<PublicInvoice />} />
+                    <Route path="/pricing" element={<Pricing />} />
+                    <Route path="/site/:companyId" element={<TenantLanding />} />
+                    <Route path="/site" element={<TenantLanding />} />
 
                     <Route
                         path="/app"

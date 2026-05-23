@@ -286,6 +286,22 @@ export default function BrandingSettings() {
                             </button>
                         </div>
                     </div>
+                    <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-3 text-xs space-y-2" data-testid="public-landing-card">
+                        <div className="font-bold uppercase tracking-wider text-slate-600">Your branded landing page</div>
+                        <div className="text-slate-600">Auto-generated marketing site using your colors, logo, and contact info. Share with prospects.</div>
+                        <div className="flex items-center gap-2">
+                            <code className="flex-1 truncate bg-white px-2 py-1 rounded border">{`${window.location.origin}/site/${company?.id || ''}`}</code>
+                            <button onClick={() => copy(`${window.location.origin}/site/${company?.id || ''}`, "Landing URL")}
+                                className="p-1.5 rounded hover:bg-slate-200" data-testid="copy-landing-url">
+                                {copied === "Landing URL" ? <Check size={14}/> : <Copy size={14}/>}
+                            </button>
+                        </div>
+                        <a href={`/site/${company?.id || ''}`} target="_blank" rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[#1D4ED8] font-semibold hover:underline"
+                            data-testid="open-landing-link">
+                            Open landing page →
+                        </a>
+                    </div>
                 </aside>
             </div>
         </div>

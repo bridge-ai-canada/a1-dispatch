@@ -26,7 +26,7 @@ export default function Landing() {
                     <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-700">
                         <a href="#features" className="hover:text-[#1D4ED8]">Features</a>
                         <a href="#industries" className="hover:text-[#1D4ED8]">Industries</a>
-                        <a href="#pricing" className="hover:text-[#1D4ED8]">Pricing</a>
+                        <Link to="/pricing" className="hover:text-[#1D4ED8]" data-testid="landing-pricing-link">Pricing</Link>
                     </div>
                     <div className="flex items-center gap-3">
                         <Link to="/login" data-testid="nav-signin-link" className="text-sm font-medium px-3 py-1.5 hover:text-[#1D4ED8]">Sign in</Link>
