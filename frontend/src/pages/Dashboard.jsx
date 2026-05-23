@@ -6,6 +6,10 @@ import { Link } from "react-router-dom";
 
 const STATUS_COLORS = {
     unscheduled: "bg-slate-100 text-slate-700 border-slate-300",
+    won_bid: "bg-violet-50 text-violet-700 border-violet-400",
+    lost_bid: "bg-rose-50 text-rose-700 border-rose-300",
+    on_hold: "bg-orange-50 text-orange-700 border-orange-400",
+    scheduled_installation: "bg-blue-50 text-[#1D4ED8] border-[#1D4ED8]/30",
     scheduled: "bg-blue-50 text-[#1D4ED8] border-[#1D4ED8]/30",
     in_progress: "bg-amber-50 text-amber-700 border-amber-400",
     completed: "bg-emerald-50 text-emerald-700 border-emerald-400",

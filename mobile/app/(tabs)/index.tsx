@@ -87,12 +87,22 @@ function JobCard({ job, palette, isDark, onPress }: any) {
         : "";
     const isEmergency = job.priority === "emergency" || job.priority === "high";
     const statusColor: any = {
+        scheduled_installation: { bg: isDark ? "#1E3A8A" : "#EFF6FF", fg: palette.primary },
         scheduled: { bg: isDark ? "#1E3A8A" : "#EFF6FF", fg: palette.primary },
+        won_bid: { bg: isDark ? "#4C1D95" : "#F5F3FF", fg: isDark ? "#C4B5FD" : "#6D28D9" },
+        lost_bid: { bg: isDark ? "#7F1D1D" : "#FFF1F2", fg: isDark ? "#FCA5A5" : "#BE123C" },
+        on_hold: { bg: isDark ? "#7C2D12" : "#FFF7ED", fg: isDark ? "#FDBA74" : "#C2410C" },
         in_progress: { bg: isDark ? "#78350F" : "#FEF3C7", fg: palette.warn },
         completed: { bg: isDark ? "#14532D" : "#DCFCE7", fg: palette.ok },
         unscheduled: { bg: palette.surface2, fg: palette.muted },
         cancelled: { bg: isDark ? "#7F1D1D" : "#FEE2E2", fg: palette.accent },
     }[job.status] || { bg: palette.surface2, fg: palette.muted };
+    const STATUS_LABEL: any = {
+        scheduled_installation: "SCHEDULED",
+        won_bid: "WON BID",
+        lost_bid: "LOST BID",
+        on_hold: "ON HOLD",
+    };
     return (
         <TouchableOpacity onPress={onPress}
             activeOpacity={0.7}
@@ -109,7 +119,7 @@ function JobCard({ job, palette, isDark, onPress }: any) {
             <View style={s.row}>
                 <Text style={[s.cardTitle, { color: palette.ink }]} numberOfLines={2}>{job.title}</Text>
                 <View style={[s.badge, { backgroundColor: statusColor.bg }]}>
-                    <Text style={[s.badgeText, { color: statusColor.fg }]}>{job.status.replace("_", " ").toUpperCase()}</Text>
+                    <Text style={[s.badgeText, { color: statusColor.fg }]}>{STATUS_LABEL[job.status] || job.status.replace("_", " ").toUpperCase()}</Text>
                 </View>
             </View>
             {!!time && <Text style={[s.cardMeta, { color: palette.muted }]}>{time}{job.duration_min ? ` · ${job.duration_min} min` : ""}</Text>}

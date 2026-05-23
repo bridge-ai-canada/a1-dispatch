@@ -38,6 +38,10 @@ const PRIORITY_RING = {
 
 const STATUS_BG = {
     unscheduled: "bg-slate-100 text-slate-700",
+    won_bid:     "bg-violet-50 text-violet-700",
+    lost_bid:    "bg-rose-50 text-rose-700",
+    on_hold:     "bg-orange-50 text-orange-700",
+    scheduled_installation: "bg-blue-50 text-[#1D4ED8]",
     scheduled:   "bg-blue-50 text-[#1D4ED8]",
     in_progress: "bg-amber-50 text-amber-700",
     completed:   "bg-emerald-50 text-emerald-700",
@@ -136,13 +140,13 @@ export default function Dispatch() {
         const prev = jobs;
         // Optimistic update
         setJobs((p) => p.map((j) => j.id === draggingId
-            ? { ...j, assigned_to: techId, scheduled_at: datetimeIso, status: j.status === "unscheduled" ? "scheduled" : j.status }
+            ? { ...j, assigned_to: techId, scheduled_at: datetimeIso, status: j.status === "unscheduled" ? "scheduled_installation" : j.status }
             : j));
         try {
             await api.patch(`/jobs/${draggingId}`, {
                 assigned_to: techId,
                 scheduled_at: datetimeIso,
-                ...(job.status === "unscheduled" ? { status: "scheduled" } : {}),
+                ...(job.status === "unscheduled" ? { status: "scheduled_installation" } : {}),
             });
         } catch (e) {
             toast.error(e.response?.data?.detail || "Reassign failed");
@@ -352,7 +356,7 @@ function JobCard({ job, compact, draggable, onDragStart, onDragEnd, dragging, st
             )}
             <div className="mt-1 flex items-center justify-between gap-1">
                 <span className={`text-[9px] px-1.5 py-0.5 font-semibold uppercase tracking-wider ${STATUS_BG[job.status] || ""}`}>
-                    {job.status.replace("_", " ")}
+                    {STATUS_LABEL[job.status]?.toLowerCase() || job.status.replace("_", " ")}
                 </span>
                 {job.price > 0 && <span className="text-[10px] font-mono font-semibold">${job.price.toFixed(0)}</span>}
             </div>

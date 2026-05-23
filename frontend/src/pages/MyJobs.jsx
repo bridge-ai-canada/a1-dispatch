@@ -7,11 +7,16 @@ import PushOptIn from "../components/PushOptIn";
 import TechStatusBar from "../components/TechStatusBar";
 
 const STATUS_NEXT = {
+    scheduled_installation: { label: "Start Job", next: "in_progress", color: "bg-[#1D4ED8]", icon: PlayCircle },
     scheduled: { label: "Start Job", next: "in_progress", color: "bg-[#1D4ED8]", icon: PlayCircle },
     in_progress: { label: "Mark Complete", next: "completed", color: "bg-emerald-600", icon: CheckCircle },
 };
 const STATUS_LABEL = {
     unscheduled: "Unscheduled",
+    won_bid: "Won bid",
+    lost_bid: "Lost bid",
+    on_hold: "On hold",
+    scheduled_installation: "Scheduled install",
     scheduled: "Scheduled",
     in_progress: "In progress",
     completed: "Completed",

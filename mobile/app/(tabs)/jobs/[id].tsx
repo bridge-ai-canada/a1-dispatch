@@ -254,7 +254,12 @@ export default function JobDetail() {
                 <Text style={[s.kicker, { color: palette.accent }]}>{job.job_type}</Text>
                 <Text style={[s.title, { color: palette.ink }]}>{job.title}</Text>
                 <View style={s.row}>
-                    <Text style={[s.status, { color: palette.primary }]}>{job.status.replace("_", " ").toUpperCase()}</Text>
+                    <Text style={[s.status, { color: palette.primary }]}>{({
+                        scheduled_installation: "SCHEDULED",
+                        won_bid: "WON BID",
+                        lost_bid: "LOST BID",
+                        on_hold: "ON HOLD",
+                    } as any)[job.status] || job.status.replace("_", " ").toUpperCase()}</Text>
                     {job.scheduled_at && <Text style={[s.meta, { color: palette.muted }]}>
                         {new Date(job.scheduled_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
                     </Text>}

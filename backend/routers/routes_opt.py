@@ -51,7 +51,7 @@ async def optimize_route(body: OptimizeIn,
     q = {
         "company_id": user["company_id"],
         "assigned_to": body.technician_id,
-        "status": {"$in": ["scheduled", "in_progress"]},
+        "status": {"$in": ["scheduled_installation", "scheduled", "in_progress"]},
         "scheduled_at": {"$regex": f"^{body.date}"},
     }
     jobs = await db.jobs.find(q, {"_id": 0}).to_list(200)

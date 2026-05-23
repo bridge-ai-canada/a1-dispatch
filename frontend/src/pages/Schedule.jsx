@@ -62,7 +62,7 @@ export default function Schedule() {
         const target = new Date(day);
         target.setHours(hour, 0, 0, 0);
         try {
-            await api.patch(`/jobs/${jobId}`, { scheduled_at: target.toISOString(), status: "scheduled" });
+            await api.patch(`/jobs/${jobId}`, { scheduled_at: target.toISOString(), status: "scheduled_installation" });
             toast.success("Rescheduled");
             load();
         } catch {

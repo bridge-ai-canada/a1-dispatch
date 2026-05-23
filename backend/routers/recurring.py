@@ -63,7 +63,7 @@ async def _materialize_due(company_id: str) -> int:
             "scheduled_at": scheduled_at,
             "duration_min": rj.get("duration_min", 60),
             "price": rj.get("price", 0.0),
-            "status": "scheduled",
+            "status": "scheduled_installation",
             "source": "recurring",
             "recurring_id": rj["id"],
         }
@@ -192,7 +192,7 @@ async def run_recurring(rid: str, user: dict = Depends(get_current_user)):
         "scheduled_at": scheduled_at,
         "duration_min": rj.get("duration_min", 60),
         "price": rj.get("price", 0.0),
-        "status": "scheduled",
+        "status": "scheduled_installation",
         "source": "recurring",
         "recurring_id": rj["id"],
     }

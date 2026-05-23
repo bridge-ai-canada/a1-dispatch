@@ -4,7 +4,17 @@ import { toast } from "sonner";
 import { Plus, X, CreditCard } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 
-const STATUS = ["unscheduled", "scheduled", "in_progress", "completed", "cancelled"];
+const STATUS = ["unscheduled", "won_bid", "on_hold", "scheduled_installation", "in_progress", "completed", "lost_bid", "cancelled"];
+const STATUS_LABEL = {
+    unscheduled: "Unscheduled",
+    won_bid: "Won bid",
+    on_hold: "On hold",
+    scheduled_installation: "Scheduled installation",
+    in_progress: "In progress",
+    completed: "Completed",
+    lost_bid: "Lost bid",
+    cancelled: "Cancelled",
+};
 
 // Convert an ISO datetime to the YYYY-MM-DDTHH:MM local string expected by <input type="datetime-local">.
 function toLocalDt(iso) {
@@ -16,7 +26,11 @@ function toLocalDt(iso) {
 
 const STATUS_COLORS = {
     unscheduled: "bg-slate-100 text-slate-700 border-slate-300",
-    scheduled: "bg-blue-50 text-[#1D4ED8] border-[#1D4ED8]/30",
+    won_bid: "bg-violet-50 text-violet-700 border-violet-400",
+    lost_bid: "bg-rose-50 text-rose-700 border-rose-300",
+    on_hold: "bg-orange-50 text-orange-700 border-orange-400",
+    scheduled_installation: "bg-blue-50 text-[#1D4ED8] border-[#1D4ED8]/30",
+    scheduled: "bg-blue-50 text-[#1D4ED8] border-[#1D4ED8]/30", // legacy
     in_progress: "bg-amber-50 text-amber-700 border-amber-400",
     completed: "bg-emerald-50 text-emerald-700 border-emerald-400",
     cancelled: "bg-red-50 text-[#DC2626] border-[#DC2626]/40",
@@ -77,7 +91,7 @@ export default function Jobs() {
                                 : "border-transparent text-slate-500 hover:text-slate-900"
                         }`}
                     >
-                        {s.replace("_"," ")}
+                        {s === "all" ? "all" : (STATUS_LABEL[s] || s.replace("_"," "))}
                         <span className="ml-2 text-xs text-slate-400">
                             {s === "all" ? jobs.length : jobs.filter((j) => j.status === s).length}
                         </span>
@@ -120,7 +134,7 @@ export default function Jobs() {
                                     {j.scheduled_at ? new Date(j.scheduled_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) : "—"}
                                 </td>
                                 <td className="px-4 py-3">
-                                    <span className={`text-xs px-2 py-1 border ${STATUS_COLORS[j.status]}`}>{j.status.replace("_"," ")}</span>
+                                    <span className={`text-xs px-2 py-1 border ${STATUS_COLORS[j.status]}`}>{STATUS_LABEL[j.status] || j.status.replace("_"," ")}</span>
                                 </td>
                                 <td className="px-4 py-3 text-right font-mono">${(j.price || 0).toFixed(0)}</td>
                                 <td className="px-4 py-3 text-right">
@@ -257,7 +271,7 @@ function JobModal({ onClose, onSaved, team, initial }) {
                         <div>
                             <label className="text-xs font-medium">Status</label>
                             <select value={form.status} onChange={update("status")} className="mt-1 w-full border border-slate-300 px-3 py-2 bg-white capitalize">
-                                {STATUS.map(s => <option key={s} value={s}>{s.replace("_"," ")}</option>)}
+                                {STATUS.map(s => <option key={s} value={s}>{STATUS_LABEL[s] || s.replace("_"," ")}</option>)}
                             </select>
                         </div>
                     </div>

@@ -259,6 +259,15 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - ✅ Sidebar nav: Estimates · Invoices · Templates
 - ✅ Backend test coverage: 23/23 pytest cases pass
 
+### v1.16 — Done (Pipeline statuses)
+- ✅ Added **Won bid**, **Lost bid**, **On hold** statuses
+- ✅ Renamed **Scheduled** → **Scheduled installation**
+- ✅ One-time DB migration runs on startup: `scheduled` → `scheduled_installation`
+- ✅ Backend validation tightened — `JobUpdate.status` now uses `Literal[]`, rejecting unknown values
+- ✅ Status colors + labels updated across Jobs, Dashboard, Dispatch, Schedule, MyJobs, JobDetail (web) and the mobile app
+- ✅ Dashboard `/dashboard/stats` now returns counts for won_bid, lost_bid, on_hold
+- ✅ Activity log + auto-comm entries fire on all new transitions
+
 ### v1.15 — Done (Technician Mobile App)
 - ✅ Dark mode with persistence (`lib/theme.tsx` ThemeProvider, AsyncStorage)
 - ✅ 5-tab nav: Today · All jobs · Timesheet · Settings · Profile

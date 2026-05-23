@@ -76,6 +76,11 @@ async def startup():
     await db.shifts.create_index([("company_id", 1), ("started_at", -1)])
     await db.materials.create_index([("company_id", 1), ("name", 1)])
     await db.checklist_templates.create_index([("company_id", 1)])
+    # one-time migration: legacy "scheduled" status -> "scheduled_installation"
+    await db.jobs.update_many(
+        {"status": "scheduled"},
+        {"$set": {"status": "scheduled_installation"}},
+    )
     await seed_demo()
 
 
@@ -144,7 +149,7 @@ async def seed_demo():
             "customer_name": "Sarah Johnson", "customer_phone": "(555) 234-1122",
             "address": "1421 Oak St, Austin TX", "job_type": "HVAC",
             "assigned_to": tech_id, "scheduled_at": today.isoformat(),
-            "duration_min": 90, "price": 189.0, "status": "scheduled",
+            "duration_min": 90, "price": 189.0, "status": "scheduled_installation",
             "paid": False, "created_at": now,
         },
         {
@@ -153,7 +158,7 @@ async def seed_demo():
             "customer_name": "Mike Patel", "customer_phone": "(555) 902-7788",
             "address": "88 Maple Ave, Round Rock TX", "job_type": "Garage Doors",
             "assigned_to": tech_id, "scheduled_at": (today + timedelta(hours=3)).isoformat(),
-            "duration_min": 120, "price": 320.0, "status": "scheduled",
+            "duration_min": 120, "price": 320.0, "status": "scheduled_installation",
             "paid": False, "created_at": now,
         },
         {

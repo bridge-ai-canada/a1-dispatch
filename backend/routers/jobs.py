@@ -51,7 +51,7 @@ async def list_jobs(
 async def create_job(body: JobIn, user: dict = Depends(get_current_user)):
     data = body.model_dump()
     if data.get("scheduled_at") and data["status"] == "unscheduled":
-        data["status"] = "scheduled"
+        data["status"] = "scheduled_installation"
     doc = {
         "id": str(uuid.uuid4()),
         "company_id": user["company_id"],
@@ -120,7 +120,7 @@ async def update_job(job_id: str, body: JobUpdate, user: dict = Depends(get_curr
             {"id": job_id, "company_id": user["company_id"]}, {"status": 1, "_id": 0}
         )
         if existing and existing.get("status") == "unscheduled":
-            updates["status"] = "scheduled"
+            updates["status"] = "scheduled_installation"
     # Capture prior assignee so we can notify on reassignment
     prior = await db.jobs.find_one(
         {"id": job_id, "company_id": user["company_id"]},
@@ -143,11 +143,21 @@ async def update_job(job_id: str, body: JobUpdate, user: dict = Depends(get_curr
         from bg_tasks import schedule_geocode
         schedule_geocode(job_id, user["company_id"], updates["address"])
     new_status = updates.get("status")
-    if new_status in ("scheduled", "in_progress", "completed", "cancelled"):
+    PIPELINE_STATUSES = ("won_bid", "lost_bid", "on_hold",
+                         "scheduled_installation", "in_progress", "completed", "cancelled")
+    if new_status in PIPELINE_STATUSES:
         await log_activity(user, f"jobs.{new_status}", "job", job_id,
                            {"title": job.get("title")})
-    if new_status in ("scheduled", "in_progress", "completed", "cancelled") and job.get("customer_id"):
-        verb = {"scheduled": "scheduled", "in_progress": "started", "completed": "completed", "cancelled": "cancelled"}[new_status]
+    if new_status in PIPELINE_STATUSES and job.get("customer_id"):
+        verb = {
+            "won_bid": "bid won for",
+            "lost_bid": "bid lost on",
+            "on_hold": "placed on hold",
+            "scheduled_installation": "scheduled for installation",
+            "in_progress": "started",
+            "completed": "completed",
+            "cancelled": "cancelled",
+        }[new_status]
         await db.communications.insert_one({
             "id": str(uuid.uuid4()), "company_id": user["company_id"],
             "customer_id": job["customer_id"], "actor_id": user["id"], "actor_name": user["name"],
@@ -202,21 +212,29 @@ async def dashboard_stats(user: dict = Depends(get_current_user)):
 
     jobs_today = 0; revenue_today = 0.0; revenue_total = 0.0
     completed = 0; in_progress = 0; scheduled = 0; unscheduled = 0
+    won_bid = 0; lost_bid = 0; on_hold = 0
     for j in all_jobs:
         s = j.get("scheduled_at") or ""
         if s.startswith(today):
             jobs_today += 1
-        if j.get("status") == "completed":
+        status = j.get("status")
+        if status == "completed":
             completed += 1
             revenue_total += float(j.get("price") or 0)
             if s.startswith(today):
                 revenue_today += float(j.get("price") or 0)
-        elif j.get("status") == "in_progress":
+        elif status == "in_progress":
             in_progress += 1
-        elif j.get("status") == "scheduled":
+        elif status in ("scheduled_installation", "scheduled"):  # legacy fallback
             scheduled += 1
-        elif j.get("status") == "unscheduled":
+        elif status == "unscheduled":
             unscheduled += 1
+        elif status == "won_bid":
+            won_bid += 1
+        elif status == "lost_bid":
+            lost_bid += 1
+        elif status == "on_hold":
+            on_hold += 1
 
     total = len(all_jobs)
     completion_rate = round((completed / total) * 100, 1) if total else 0.0
@@ -229,6 +247,7 @@ async def dashboard_stats(user: dict = Depends(get_current_user)):
         "totals": {
             "total": total, "completed": completed, "in_progress": in_progress,
             "scheduled": scheduled, "unscheduled": unscheduled,
+            "won_bid": won_bid, "lost_bid": lost_bid, "on_hold": on_hold,
         },
     }
 

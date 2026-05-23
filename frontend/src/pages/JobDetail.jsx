@@ -9,8 +9,11 @@ import {
 } from "@phosphor-icons/react";
 
 const STATUS_NEXT = {
-    unscheduled: { label: "Schedule", next: "scheduled" },
-    scheduled: { label: "Start Job", next: "in_progress" },
+    unscheduled: { label: "Schedule", next: "scheduled_installation" },
+    won_bid: { label: "Schedule", next: "scheduled_installation" },
+    on_hold: { label: "Resume", next: "scheduled_installation" },
+    scheduled_installation: { label: "Start Job", next: "in_progress" },
+    scheduled: { label: "Start Job", next: "in_progress" }, // legacy fallback
     in_progress: { label: "Mark Complete", next: "completed" },
 };
 
