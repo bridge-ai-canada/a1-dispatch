@@ -369,6 +369,26 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - ✅ Job's `financing_application_id` is set as back-reference after creation.
 - ✅ Backend 9/9 + frontend 100% (iteration 23).
 
+### Feb 2026 — Iteration 24 — Financeit-style Programs + AI Pitch
+- ⚠️ Tech-stack note: spec mentioned Node + Postgres but kept the running FastAPI + MongoDB stack (full app stack swap would have meant rebuilding everything; business logic + API shape matches the Financeit-style spec).
+- ✅ **Minimum financed amount bumped to $4,500** in `fresh_cash_service.MIN_AMOUNT`. Max bumped to $150k. Min term 3mo, max term 120mo, max amortization 240mo. Job-Detail web + mobile buttons updated to require $4,500 to surface.
+- ✅ **Program catalog** (`fresh_cash_service.DEFAULT_PROGRAMS`): 16 system-default plans auto-seeded per tenant:
+   - 6× Standard (60/120, 60/180, 60/240, 36/180, 84/240, 120/240)
+   - 2× Buy-Down (13.99→9.99 @ 8% fee, 13.99→7.99 @ 12% fee)
+   - 5× 0% Promo (equal-pay 3/6/12/18/24)
+   - 3× Deferred (3mo, 6mo accrual, 6mo no-accrual)
+- ✅ **Program-quote math** (`program_quote()`): handles 4 kinds — standard / buydown (with `customer_savings_vs_base`) / promo (0% equal pay) / deferred (interest-accrue toggle, balance_after_deferral). Computes dealer_fee_pct + contractor_fee_dollars + net_payout + monthly_payment + balloon_payment + total_interest + total_payback in one call.
+- ✅ **Admin CRUD**: `GET/POST/PATCH/DELETE /api/financing/programs` (owner/super_admin). Soft-disable on system defaults (active=false) instead of hard delete. New `POST /api/financing/program-quote` accepts either `program_id` or inline `program` dict.
+- ✅ **Extended application form** (`ApplicantDetailsIn`): added SIN, address/city/state/postal_code, home_ownership, employer_name, years_employed, project_description. ssn4 now optional (Canadian-friendly).
+- ✅ **Linkage** — `program_id` propagated through `ApplicationCreateIn` + `JobFinanceIn`; from-job SMS now uses program-quoted monthly payment with smart-comparison copy.
+- ✅ **AI pitch generator** `POST /api/financing/ai/pitch` — template-based, deterministic (no LLM cost). Picks the closest relatable comparison from `_COMPARISONS` ladder (a streaming bundle, a coffee habit, a family pizza night, etc.) and returns 3 SMS pitch variations + a `default`.
+- ✅ **Frontend pages**:
+  - `/app/financing/programs` — admin program manager: 5 filter chips, 16+ cards with kind/APR/term/amort/fee surfaced, edit modal with **live preview pane** showing monthly + dealer fee + net payout at $12k as you change values.
+  - `/app/financing` Calculator modal rewritten — program-picker drives the breakdown (monthly, net payout, dealer fee, balloon, total interest, total payback).
+  - Job-Detail FinanceJobModal — added program dropdown + live quote box (customer pays X/mo, your payout, dealer fee).
+  - Sidebar: "Finance programs" entry for owner + super_admin.
+- ✅ Backend 17/17 pytest + frontend 100% on program CRUD, all 4 quote kinds, AI pitch, min-amount enforcement (iteration 24). `retest_needed=False`.
+
 ### P1 — Remaining
 - Stripe Price IDs (`STRIPE_PRICE_STARTER`, `STRIPE_PRICE_LITE`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_ENTERPRISE`) for real billing — currently dev-mode flips plan locally.
 - Twilio SMS — backend wired & gated, awaiting credentials.
