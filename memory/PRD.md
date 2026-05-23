@@ -343,6 +343,13 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - ✅ Startup migration: existing companies default-seeded to Starter plan; demo company promoted to Pro.
 - ✅ Backend 37/37 pytest cases pass + frontend 5/5 pages smoke-passed (iteration 19).
 
+### Feb 2026 — Iteration 20/21 — Public Pricing + White-Label Tenant Landing
+- ✅ **Public pricing page** at `/pricing` — unauthenticated, renders from `GET /api/subscription/plans`. 4 plan cards (Starter $120 / Lite $220 / Pro $360 / Enterprise $899), monthly/annual toggle (annual saves 15% display), 8-row compare table with all features, 4-question FAQ accordion. All CTAs route to `/register`. Landing page nav `Pricing` link wired to the route.
+- ✅ **Public tenant landing** at `/site/:companyId` (and `/site?domain=…` fallback) — unauthenticated, renders from `GET /api/public/branding`. Hero with tenant tagline/app_name/support_phone, services grid (4 cards), how-it-works steps, contact section with phone/email links, footer. Hero gradient uses tenant primary→secondary colors. All "Book service" CTAs point to `/book/:companyId`.
+- ✅ **New public asset endpoint** `GET /api/public/branding/asset/{company_id}/{kind}` (kind = logo|favicon) — serves tenant branding images without auth, with path-prefix validation defense-in-depth. `logo_url` and `favicon_url` are now returned from `GET /api/public/branding` so the landing page can display them.
+- ✅ **BrandingSettings sidebar** now surfaces the tenant's branded-landing URL with copy + open-in-new-tab button. Clipboard writes wrapped in try/catch + `execCommand` fallback to avoid sandbox-iframe overlay errors.
+- ✅ Iteration 21 retest: backend 6/6 + frontend 100% on targeted flows.
+
 ### P1 — Remaining
 - Stripe Price IDs (`STRIPE_PRICE_STARTER`, `STRIPE_PRICE_LITE`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_ENTERPRISE`) for real billing — currently dev-mode flips plan locally.
 - Twilio SMS — backend wired & gated, awaiting credentials.
