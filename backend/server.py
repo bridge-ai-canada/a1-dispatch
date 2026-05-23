@@ -12,7 +12,8 @@ from deps import (
     init_storage,
     hash_password, verify_password,
 )
-from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates, timesheets, checklists, materials, ai, sms, branding, branches, msg_templates, subscription, tenants, api_keys, financing, analytics
+from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates, timesheets, checklists, materials, ai, sms, branding, branches, msg_templates, subscription, tenants, api_keys, financing, analytics, integrations as integrations_router, webhooks as webhooks_router
+from services import sync_engine
 
 app = FastAPI(title="A1 Field Pro API")
 api = APIRouter(prefix="/api")
@@ -47,6 +48,8 @@ api.include_router(tenants.router)
 api.include_router(api_keys.router)
 api.include_router(financing.router)
 api.include_router(analytics.router)
+api.include_router(integrations_router.router)
+api.include_router(webhooks_router.router)
 
 
 @api.get("/")
@@ -110,6 +113,16 @@ async def startup():
     await db.finance_rentals.create_index([("company_id", 1), ("status", 1)])
     await db.finance_programs.create_index([("company_id", 1), ("key", 1)], unique=True)
     await db.finance_programs.create_index([("company_id", 1), ("active", 1), ("kind", 1)])
+    # --- Integrations / Webhooks ---
+    await db.integrations.create_index([("company_id", 1), ("provider", 1)], unique=True)
+    await db.integrations.create_index("provider")
+    await db.oauth_states.create_index("state", unique=True)
+    await db.oauth_states.create_index("expires_at", expireAfterSeconds=0)
+    await db.webhook_subscriptions.create_index([("company_id", 1), ("active", 1)])
+    await db.webhook_subscriptions.create_index("id", unique=True)
+    await db.webhook_deliveries.create_index([("company_id", 1), ("created_at", -1)])
+    await db.webhook_events.create_index([("provider", 1), ("received_at", -1)])
+    await db.integration_sync_events.create_index([("company_id", 1), ("created_at", -1)])
     # one-time migration: legacy "scheduled" status -> "scheduled_installation"
     await db.jobs.update_many(
         {"status": "scheduled"},
@@ -130,6 +143,10 @@ async def startup():
             {"$set": {"subscription.plan": "pro", "subscription.status": "active"}},
         )
     await seed_demo()
+    try:
+        sync_engine.start()
+    except Exception as e:
+        logger.error(f"sync_engine start failed: {e}")
 
 
 async def seed_demo():
@@ -257,4 +274,8 @@ app.add_middleware(
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    try:
+        sync_engine.stop()
+    except Exception:
+        pass
     client.close()

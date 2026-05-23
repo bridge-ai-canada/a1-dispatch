@@ -69,6 +69,12 @@ async def create_job(body: JobIn, user: dict = Depends(get_current_user)):
         await hub.broadcast(user["company_id"], "job.created", doc)
     except Exception:
         pass
+    # Outbound webhooks
+    try:
+        from services.webhook_emitter import emit
+        await emit(user["company_id"], "job.created", doc)
+    except Exception:
+        pass
     # Async geocode if there's an address
     if doc.get("address"):
         from bg_tasks import schedule_geocode

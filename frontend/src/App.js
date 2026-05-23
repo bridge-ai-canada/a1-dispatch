@@ -53,6 +53,8 @@ import FinancingContractor from "./pages/FinancingContractor";
 import FinancingAdmin from "./pages/FinancingAdmin";
 import FinancingPrograms from "./pages/FinancingPrograms";
 import Analytics from "./pages/Analytics";
+import Integrations from "./pages/Integrations";
+import Webhooks from "./pages/Webhooks";
 
 function HashGuard({ children }) {
     // Per Emergent Auth playbook: detect session_id synchronously during render
@@ -117,6 +119,8 @@ function App() {
                         <Route path="recurring" element={<RecurringJobs />} />
                         <Route path="reports" element={<Reports />} />
                         <Route path="analytics" element={<Analytics />} />
+                        <Route path="integrations" element={<Integrations />} />
+                        <Route path="integrations/webhooks" element={<Webhooks />} />
                         <Route path="dispatch" element={<Dispatch />} />
                         <Route path="estimates" element={<Estimates />} />
                         <Route path="estimates/new" element={<EstimateBuilder />} />
