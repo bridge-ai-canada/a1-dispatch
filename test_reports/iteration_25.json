@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 25 — Executive Analytics dashboard end-to-end test. 20/20 pytest pass against /api/analytics/{overview,revenue (day/week/month),technicians,marketing,calls,financing-conversion,memberships,leaderboard (revenue/jobs/rating),realtime,export.csv (revenue/technicians/marketing/financing/leaderboard)}; unauth → 401; super_admin login OK and overview returns 200. Frontend Analytics page wired into App.js (/app/analytics) + Layout sidebar (data-testid nav-analytics-link present for owner). UI verified end-to-end: Overview live banner (in_progress=12, completed=0, revenue $0, new_finance_apps=19, funded=1) + 8 KPI cards (Revenue $2,200 / Jobs completed 1 / Avg ticket $2,200 / Active customers 3 / Finance funded $5,000 / Finance count 1 / Jobs total 34 / Jobs paid 1) + Revenue AreaChart renders. Revenue tab LineChart renders + day/week/month toggles fire re-fetches. Technicians BarChart + 1 tech row. Marketing PieChart. Calls funnel bars. Financing 4 KPIs + funnel BarChart. Memberships 8 KPI cards. Leaderboard table with top-row gold styling + revenue/jobs/rating metric toggles + sortable. CSV download confirmed for revenue (revenue-2026-04-23-to-2026-05-23.csv) and leaderboard (leaderboard-2026-04-23-to-2026-05-23.csv) via fetch + a.click pattern; toast 'CSV downloaded' shows. Date filter re-renders without crash.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_25_analytics.py",
+    "/app/test_reports/pytest/iteration_25_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Analytics.jsx line 92 ternary: `tab === 'techs' ? 'technicians' : tab === 'memberships' ? null : tab === 'overview' ? null : tab` is hard to follow. The `.includes(...)` then checks if null/string is in the array. It works (null/overview/memberships exclude correctly) but a simple set like `['revenue','techs','marketing','financing','leaderboard'].includes(tab)` would be clearer.",
+    "Analytics.jsx Overview useEffect re-creates the 30s polling interval on every params change (deps=[JSON.stringify(params)]). Each date-filter change tears down + sets a new interval — fine but consider a separate effect for the polling tick so the interval only depends on auth/user, not date filter.",
+    "Analytics.jsx Memberships() does not respect branch_id or date range filters even though those filters render in the global header. Backend membership endpoint also ignores branch_id. Either grey out the filter when on Memberships tab or document that memberships are tenant-wide.",
+    "analytics.py overview/revenue/etc use string-comparison for date ranges ($gte/$lte on created_at as ISO strings). This works because Python isoformat is lexicographically sortable, BUT mixing tz-aware and tz-naive ISO strings in the DB could mis-sort. Suggest standardising created_at writes to always include +00:00.",
+    "analytics.py membership_retention does NOT accept branch_id — inconsistent with other endpoints. Fine if memberships are company-level but UI should hide the branch filter on that tab.",
+    "analytics.py export_csv financing branch: writes by_status dict keys (started/decisioned/signed/funded/declined) as separate rows but the funnel computation already aggregated. The CSV is the 'status breakdown' not the funnel — fine but not labelled in CSV header.",
+    "analytics.py revenue_series default_days=60 but overview uses 30 — slight inconsistency in 'default window' across endpoints. Frontend always passes explicit start/end so not user-facing.",
+    "All key UI elements have data-testid attributes (analytics-tab-*, analytics-export-btn, analytics-start, analytics-end, analytics-branch, rev-gran-*, lb-metric-*, lb-row-*, tech-row-*, realtime-banner, calls-funnel, fin-funnel) — excellent testability."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration_25_analytics.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "demo@a1fieldpro.com / Demo1234! (owner, MFA disabled); superadmin@a1fieldpro.com / Super1234! (super_admin, MFA disabled)",
+  "seed_data_creation": "None for this iteration — used existing demo tenant data.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend test at /app/backend/tests/test_iteration_25_analytics.py covers all 10 analytics endpoints + CSV export (5 variants) + auth gate. Frontend Analytics.jsx is fully wired: route /app/analytics, sidebar nav-analytics-link (roles: owner/office_manager/accountant/super_admin), all tabs use data-testid analytics-tab-{key}. CSV download uses fetch+blob+a.click (not window.location) with 'a.token' bearer fallback. Date filter sends ISO strings via _parse_range (works since created_at is stored as ISO string).",
+  "rca of the issue": "N/A — no bugs found in this iteration."
+}

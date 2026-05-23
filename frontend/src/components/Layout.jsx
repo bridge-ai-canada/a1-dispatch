@@ -31,6 +31,7 @@ const baseNav = [
     { to: "/app/my-jobs", label: "My Jobs", icon: DeviceMobile, roles: ["owner","dispatcher","technician"] },
     { to: "/app/recurring", label: "Recurring", icon: ArrowsClockwise, roles: ["owner","dispatcher","office_manager"] },
     { to: "/app/reports", label: "Reports", icon: ChartLine, roles: ["owner","accountant","super_admin"] },
+    { to: "/app/analytics", label: "Analytics", icon: ChartLine, roles: ["owner","office_manager","accountant","super_admin"] },
     { to: "/app/admin/users", label: "Users", icon: ShieldCheck, roles: ["owner","super_admin"] },
     { to: "/app/admin/activity", label: "Activity", icon: ClockCounterClockwise, roles: ["owner","office_manager","accountant","super_admin"] },
     { to: "/app/settings/branding", label: "Branding", icon: PaintBrush, roles: ["owner","super_admin"] },

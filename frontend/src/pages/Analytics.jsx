@@ -48,7 +48,11 @@ export default function Analytics() {
     const downloadCsv = async (report) => {
         try {
             const url = `${API_BASE}/analytics/export.csv?report=${report}&start=${encodeURIComponent(params.start)}&end=${encodeURIComponent(params.end)}${branchId ? `&branch_id=${branchId}` : ""}`;
-            const res = await fetch(url, { headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` } });
+            const token = localStorage.getItem("a1.token") || "";
+            const res = await fetch(url, {
+                credentials: "include",
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
             if (!res.ok) throw new Error("Export failed");
             const blob = await res.blob();
             const a = document.createElement("a");
