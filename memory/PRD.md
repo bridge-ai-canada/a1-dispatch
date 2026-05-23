@@ -362,6 +362,13 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - ✅ **6 new tenant-scoped collections** with indexes: finance_applications (public_token unique), finance_contracts, finance_buydowns, finance_funding_events, finance_rentals.
 - ✅ Backend 19/19 financing endpoints + frontend 100% on customer wizard + contractor dashboard (iteration 22). `retest_needed=False`.
 
+### Feb 2026 — Iteration 23 — "Finance this Job" Field-Sales Tool
+- ✅ **Endpoint** `POST /api/financing/from-job` — accepts `{job_id, amount?, term_months?, send_sms?, origin_url?}`. Pulls customer data from the job, creates a Fresh Cash application, optionally texts the apply link via Twilio. Idempotent per job. Technician role can call it (designed for field sales). 400 on amount<$500, 404 on bad/cross-tenant job, graceful sms_result error structure when Twilio off / no phone / no origin.
+- ✅ **Web Job Detail** — new "Finance this job" button (next to Charge) on the job detail page when `price >= 500 && !paid`. Opens a modal with amount/term editor, two actions: "Create link only" / "Text now". Success view shows the public customer URL with copy + "Open customer view" link.
+- ✅ **Mobile Job Detail** (`/app/mobile/app/(tabs)/jobs/[id].tsx`) — new "Finance this job ($X)" big button on the Customer section. Alert dialog with 3 options: Cancel / Create link only / Create + text. Successful flow shows the URL with native copy via expo-clipboard + open-in-browser.
+- ✅ Job's `financing_application_id` is set as back-reference after creation.
+- ✅ Backend 9/9 + frontend 100% (iteration 23).
+
 ### P1 — Remaining
 - Stripe Price IDs (`STRIPE_PRICE_STARTER`, `STRIPE_PRICE_LITE`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_ENTERPRISE`) for real billing — currently dev-mode flips plan locally.
 - Twilio SMS — backend wired & gated, awaiting credentials.
