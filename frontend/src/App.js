@@ -40,6 +40,12 @@ import AICenter from "./pages/AICenter";
 import Pipeline from "./pages/Pipeline";
 import PublicEstimate from "./pages/PublicEstimate";
 import PublicInvoice from "./pages/PublicInvoice";
+import BrandingSettings from "./pages/BrandingSettings";
+import Branches from "./pages/Branches";
+import MessageTemplates from "./pages/MessageTemplates";
+import Subscription from "./pages/Subscription";
+import SuperTenants from "./pages/SuperTenants";
+import ApiKeys from "./pages/ApiKeys";
 
 function HashGuard({ children }) {
     // Per Emergent Auth playbook: detect session_id synchronously during render
@@ -112,6 +118,12 @@ function App() {
                         <Route path="ai" element={<AICenter />} />
                         <Route path="pipeline" element={<Pipeline />} />
                         <Route path="notifications" element={<NotificationPrefs />} />
+                        <Route path="settings/branding" element={<BrandingSettings />} />
+                        <Route path="settings/branches" element={<Branches />} />
+                        <Route path="settings/templates" element={<MessageTemplates />} />
+                        <Route path="settings/subscription" element={<Subscription />} />
+                        <Route path="settings/api-keys" element={<ApiKeys />} />
+                        <Route path="super/tenants" element={<SuperTenants />} />
                     </Route>
 
                     <Route path="*" element={<Navigate to="/" replace />} />

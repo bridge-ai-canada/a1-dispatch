@@ -109,8 +109,7 @@ async def sms_job_reminder(body: JobReminderIn, user: dict = Depends(get_current
     await db.jobs.update_one(
         {"id": job["id"]}, {"$set": {"reminder_sms_sent_at": now_iso()}},
     )
-    await log_activity(user["company_id"], user["id"], "sms.reminder_sent",
-                       {"job_id": job["id"], "to": phone})
+    await log_activity(user, "sms.reminder_sent", meta={"job_id": job["id"], "to": phone})
     return result
 
 
@@ -161,8 +160,7 @@ async def sms_send_due_reminders(
             )
         else:
             failed += 1
-    await log_activity(user["company_id"], user["id"], "sms.batch_reminders",
-                       {"sent": sent, "failed": failed, "window_hours": window_hours})
+    await log_activity(user, "sms.batch_reminders", meta={"sent": sent, "failed": failed, "window_hours": window_hours})
     return {"sent": sent, "failed": failed}
 
 

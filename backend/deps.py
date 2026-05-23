@@ -387,7 +387,28 @@ _HEX_COLOR_RE = r"^#[0-9A-Fa-f]{6}$"
 class BrandingIn(BaseModel):
     primary_color: Optional[str] = Field(default=None, pattern=_HEX_COLOR_RE)
     accent_color: Optional[str] = Field(default=None, pattern=_HEX_COLOR_RE)
+    secondary_color: Optional[str] = Field(default=None, pattern=_HEX_COLOR_RE)
     logo_path: Optional[str] = None
+    favicon_path: Optional[str] = None
+    app_name: Optional[str] = None  # white-label product name
+    custom_domain: Optional[str] = None
+    support_email: Optional[str] = None
+    support_phone: Optional[str] = None
+    invoice_footer: Optional[str] = None
+    email_from_name: Optional[str] = None
+    tagline: Optional[str] = None
+
+    @field_validator("custom_domain")
+    @classmethod
+    def _norm_domain(cls, v):
+        if not v:
+            return v
+        v = v.strip().lower()
+        if v.startswith("http://"):
+            v = v[7:]
+        if v.startswith("https://"):
+            v = v[8:]
+        return v.split("/")[0] or None
 
 class JobIn(BaseModel):
     title: str

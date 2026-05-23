@@ -12,7 +12,7 @@ from deps import (
     init_storage,
     hash_password, verify_password,
 )
-from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates, timesheets, checklists, materials, ai, sms
+from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates, timesheets, checklists, materials, ai, sms, branding, branches, msg_templates, subscription, tenants, api_keys
 
 app = FastAPI(title="A1 Field Pro API")
 api = APIRouter(prefix="/api")
@@ -39,6 +39,12 @@ api.include_router(checklists.router)
 api.include_router(materials.router)
 api.include_router(ai.router)
 api.include_router(sms.router)
+api.include_router(branding.router)
+api.include_router(branches.router)
+api.include_router(msg_templates.router)
+api.include_router(subscription.router)
+api.include_router(tenants.router)
+api.include_router(api_keys.router)
 
 
 @api.get("/")
@@ -82,11 +88,36 @@ async def startup():
     await db.maintenance_suggestions.create_index([("company_id", 1), ("status", 1)])
     await db.chatbot_messages.create_index([("session_id", 1), ("created_at", 1)])
     await db.sms_log.create_index([("company_id", 1), ("created_at", -1)])
+    await db.branches.create_index([("company_id", 1), ("active", 1)])
+    await db.message_templates.create_index([("company_id", 1), ("key", 1)], unique=True)
+    await db.message_templates.create_index([("company_id", 1), ("kind", 1)])
+    await db.branding_audit.create_index([("company_id", 1), ("created_at", -1)])
+    await db.companies.create_index("branding.custom_domain", unique=True, sparse=True)
+    await db.companies.create_index("subscription.plan")
+    await db.companies.create_index("parent_franchise_id")
+    await db.franchises.create_index("name")
+    await db.api_keys.create_index("hash", unique=True, sparse=True)
+    await db.api_keys.create_index([("company_id", 1), ("active", 1)])
+    await db.subscription_checkouts.create_index("session_id", unique=True)
     # one-time migration: legacy "scheduled" status -> "scheduled_installation"
     await db.jobs.update_many(
         {"status": "scheduled"},
         {"$set": {"status": "scheduled_installation"}},
     )
+    # Idempotent: ensure all existing companies have a subscription block + branding defaults.
+    await db.companies.update_many(
+        {"subscription": {"$exists": False}},
+        {"$set": {"subscription": {"plan": "starter", "status": "active",
+                                   "updated_at": now_iso()}}},
+    )
+    # Promote demo company to Pro so feature gates can be exercised.
+    demo_email_seed = os.environ.get("ADMIN_EMAIL", "demo@a1fieldpro.com")
+    demo_owner = await db.users.find_one({"email": demo_email_seed.lower()}, {"_id": 0, "company_id": 1})
+    if demo_owner and demo_owner.get("company_id"):
+        await db.companies.update_one(
+            {"id": demo_owner["company_id"]},
+            {"$set": {"subscription.plan": "pro", "subscription.status": "active"}},
+        )
     await seed_demo()
 
 
@@ -132,6 +163,18 @@ async def seed_demo():
     await db.companies.insert_one({
         "id": company_id, "name": "A1 HVAC N DE-GO", "industry": "HVAC",
         "owner_id": owner_id, "created_at": now,
+        "branding": {
+            "primary_color": "#1D4ED8", "accent_color": "#DC2626",
+            "secondary_color": "#0F172A",
+            "app_name": "A1 Field Pro", "tagline": "Field service that just works.",
+            "support_email": "support@a1fieldpro.com",
+            "support_phone": "(555) 123-4567",
+            "invoice_footer": "Thank you for your business — A1 HVAC N DE-GO.",
+        },
+        "subscription": {
+            "plan": "pro", "status": "active",
+            "updated_at": now,
+        },
     })
     await db.users.insert_many([
         {"id": owner_id, "company_id": company_id, "name": "Demo Owner",

@@ -6,7 +6,7 @@ import {
     AddressBook, GearSix, SignOut, List, X, DeviceMobile,
     ShieldCheck, ClockCounterClockwise, Buildings, EnvelopeSimple,
     ArrowsClockwise, ChartLine, Broadcast, FileText, Receipt, Stack, Sparkle,
-    Kanban,
+    Kanban, PaintBrush, ChatText, CreditCard, Key, Globe,
 } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import api from "../lib/api";
@@ -30,6 +30,12 @@ const baseNav = [
     { to: "/app/reports", label: "Reports", icon: ChartLine, roles: ["owner","accountant","super_admin"] },
     { to: "/app/admin/users", label: "Users", icon: ShieldCheck, roles: ["owner","super_admin"] },
     { to: "/app/admin/activity", label: "Activity", icon: ClockCounterClockwise, roles: ["owner","office_manager","accountant","super_admin"] },
+    { to: "/app/settings/branding", label: "Branding", icon: PaintBrush, roles: ["owner","super_admin"] },
+    { to: "/app/settings/branches", label: "Branches", icon: Buildings, roles: ["owner","office_manager","super_admin"] },
+    { to: "/app/settings/templates", label: "Messages", icon: ChatText, roles: ["owner","office_manager","super_admin"] },
+    { to: "/app/settings/subscription", label: "Subscription", icon: CreditCard, roles: ["owner","super_admin"] },
+    { to: "/app/settings/api-keys", label: "API keys", icon: Key, roles: ["owner","super_admin"] },
+    { to: "/app/super/tenants", label: "Tenants", icon: Globe, roles: ["super_admin"] },
     { to: "/app/settings", label: "Settings", icon: GearSix, roles: ["owner","super_admin"] },
 ];
 

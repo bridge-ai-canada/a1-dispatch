@@ -31,6 +31,18 @@ export function AuthProvider({ children }) {
         refresh();
     }, [refresh]);
 
+    // Apply tenant branding as CSS vars + document title whenever company changes.
+    useEffect(() => {
+        if (!company) return;
+        const b = company.branding || {};
+        const root = document.documentElement;
+        if (b.primary_color) root.style.setProperty("--brand-primary", b.primary_color);
+        if (b.accent_color) root.style.setProperty("--brand-accent", b.accent_color);
+        if (b.secondary_color) root.style.setProperty("--brand-secondary", b.secondary_color);
+        const appName = b.app_name || company.name;
+        if (appName) document.title = appName;
+    }, [company]);
+
     const login = async (email, password, mfa_code) => {
         const { data } = await api.post("/auth/login", { email, password, mfa_code });
         if (data.token) try { localStorage.setItem("a1.token", data.token); } catch (_) {}
