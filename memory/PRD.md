@@ -257,7 +257,25 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - ✅ Convert approved estimate → invoice (selected tier + selected addons), sequential numbering (E-0001, I-0001 per company)
 - ✅ Reusable estimate & invoice templates with builder dropdown
 - ✅ Sidebar nav: Estimates · Invoices · Templates
-- ✅ Backend test coverage: 23/23 pytest cases pass (CRUD, math, send, PDF, public approval/decline, financing-quote, convert flow, Stripe checkout, templates, multi-tenant isolation, webhook hook)
+- ✅ Backend test coverage: 23/23 pytest cases pass
+
+### v1.15 — Done (Technician Mobile App)
+- ✅ Dark mode with persistence (`lib/theme.tsx` ThemeProvider, AsyncStorage)
+- ✅ 5-tab nav: Today · All jobs · Timesheet · Settings · Profile
+- ✅ **Timesheet screen** — big clock-in/out, live elapsed counter, +15m/+30m breaks, today/week totals, recent-shifts history
+- ✅ **Per-job time tracking** — start/stop timer on job, total minutes, live counter while running
+- ✅ **Checklists** — apply template from picker, tap-to-toggle items with checkbox + line-through
+- ✅ **Materials** — add from catalog (auto-fills price + decrements stock) or custom; per-job usage list with totals
+- ✅ **Voice notes** — modal with auto-focus textarea + hint to use device keyboard mic 🎤
+- ✅ **Photo capture** with timestamp overlay on thumbnail; library import; **video capture** (60s max) with playback via browser
+- ✅ **E-signature** capture (`react-native-signature-canvas`)
+- ✅ **Navigate button** — opens Apple Maps on iOS, Google Maps Navigation on Android
+- ✅ **Invoice collection** — Stripe Checkout in-app via WebBrowser
+- ✅ **Settings screen** — theme picker (light/dark/system), push toggle, pending-changes pill, "Sync now", sign-out
+- ✅ **Offline mode** — AsyncStorage queue, auto-flush every 20s, retry on focus, banner shows pending count
+- ✅ **Real-time sync** — 30s background refetch on Today + on-focus refresh everywhere
+- ✅ Large field-friendly buttons throughout (min 16px vertical padding, 16-44px touch targets)
+- ✅ Backend test coverage: 38/38 pytest cases pass
 
 ### P1 — Remaining
 - Apple login (needs Apple Developer credentials from user)
