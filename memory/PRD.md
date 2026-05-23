@@ -316,8 +316,18 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 
 ### P1 — Remaining
 - Apple login (needs Apple Developer credentials from user)
-- Twilio SMS (needs credentials)
-- Mapbox/Google fallback for Nominatim 429 rate limiting
+- Twilio SMS — backend wired & gated, awaiting Twilio credentials from user
+- Mapbox/Google fallback for Nominatim 429 — wired in geocode_service.py, awaiting MAPBOX_ACCESS_TOKEN or GOOGLE_MAPS_API_KEY
+
+### Feb 2026 — Iteration 18
+- ✅ Pipeline `In progress` + `Completed` columns now always visible (no toggle), positioned after Scheduled install
+- ✅ Twilio SMS service added (`/app/backend/sms_service.py`, `/app/backend/routers/sms.py`)
+   - Endpoints: `GET /api/sms/status`, `POST /api/sms/send`, `POST /api/sms/job-reminder`,
+     `POST /api/sms/send-due-reminders?window_hours=24`, `GET /api/sms/log`
+   - Graceful 503 with helpful error when `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN`/`TWILIO_FROM_NUMBER` not set
+   - RBAC: owner/dispatcher/office_manager/csr/super_admin only
+- ✅ Geocoding refactored — Mapbox primary (when `MAPBOX_ACCESS_TOKEN` set) → Google fallback → Nominatim
+- ✅ All 17/17 iteration 18 pytest cases pass; no regressions in SMS/geocode/pipeline paths
 
 ### P2 — Future
 - Apple login (needs Apple Developer credentials)
