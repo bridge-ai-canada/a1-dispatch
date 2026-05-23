@@ -6,6 +6,7 @@ import {
     AddressBook, GearSix, SignOut, List, X, DeviceMobile,
     ShieldCheck, ClockCounterClockwise, Buildings, EnvelopeSimple,
     ArrowsClockwise, ChartLine, Broadcast, FileText, Receipt, Stack, Sparkle,
+    Kanban,
 } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import api from "../lib/api";
@@ -15,6 +16,7 @@ import OfflineIndicator from "./OfflineIndicator";
 const baseNav = [
     { to: "/app/dashboard", label: "Dashboard", icon: SquaresFour, roles: ["owner","dispatcher","office_manager","csr","sales_rep","accountant","technician"] },
     { to: "/app/jobs", label: "Work Orders", icon: Wrench, roles: ["owner","dispatcher","office_manager","csr","sales_rep","accountant"] },
+    { to: "/app/pipeline", label: "Pipeline", icon: Kanban, roles: ["owner","dispatcher","office_manager","sales_rep"] },
     { to: "/app/dispatch", label: "Dispatch", icon: Broadcast, roles: ["owner","dispatcher","office_manager"] },
     { to: "/app/schedule", label: "Schedule", icon: CalendarBlank, roles: ["owner","dispatcher","office_manager"] },
     { to: "/app/team", label: "Team", icon: UsersThree, roles: ["owner","dispatcher","office_manager"] },

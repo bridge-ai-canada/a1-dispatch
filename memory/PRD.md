@@ -259,6 +259,17 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - ✅ Sidebar nav: Estimates · Invoices · Templates
 - ✅ Backend test coverage: 23/23 pytest cases pass
 
+### v1.18 — Done (Pipeline Kanban)
+- ✅ New `/app/pipeline` page — drag-and-drop Kanban view of jobs
+- ✅ 6 default columns: Unscheduled · Won bid · Scheduled install · In progress · On hold · Completed
+- ✅ Optional Lost bid + Cancelled columns (toggle via "Show lost/cancelled" button)
+- ✅ Each column shows count badge + total revenue (sum of card `price`)
+- ✅ Cards display title, customer, address, scheduled date, price; emergency jobs bordered red with priority badge
+- ✅ Native HTML5 drag-and-drop with optimistic UI + auto-rollback on failure
+- ✅ Search bar filters across title/customer/address
+- ✅ Sidebar nav: "Pipeline" link with Kanban icon
+- ✅ All transitions validated end-to-end via `PATCH /api/jobs/{id}` (won_bid → scheduled → in_progress → on_hold → scheduled)
+
 ### v1.17 — Done (AI Integration)
 - ✅ **8 AI features** live across the platform, powered by OpenAI via Emergent Universal LLM Key (gpt-4o / gpt-4o-mini)
   - **Estimate generator** — "✨ Generate with AI" on Estimate Builder → 3 G/B/B tiers from a prompt
