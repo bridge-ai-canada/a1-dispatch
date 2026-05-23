@@ -389,6 +389,33 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
   - Sidebar: "Finance programs" entry for owner + super_admin.
 - ✅ Backend 17/17 pytest + frontend 100% on program CRUD, all 4 quote kinds, AI pitch, min-amount enforcement (iteration 24). `retest_needed=False`.
 
+### Feb 2026 — Iteration 25 — Executive Analytics Dashboard
+- ✅ **Backend** (`/app/backend/routers/analytics.py`) — 10 endpoints, tenant-scoped via `company_id`, optional `branch_id` + date-range filters (`start`/`end` ISO):
+  - `GET /api/analytics/overview` — Revenue, Δ% vs prev window, jobs total/completed/paid, avg ticket, active customers, finance funded $ + count.
+  - `GET /api/analytics/revenue?granularity=day|week|month` — time-bucketed series (revenue + jobs).
+  - `GET /api/analytics/technicians` — per-tech aggregation: jobs, completion %, revenue, avg rating, tips.
+  - `GET /api/analytics/marketing` — leads/won/conversion/revenue by source + optional ROI from `marketing_costs`.
+  - `GET /api/analytics/calls` — inbound calls → book rate → close rate → avg ticket funnel.
+  - `GET /api/analytics/financing-conversion` — Started → decisioned → signed → funded funnel + approval/sign/fund rates + funded $.
+  - `GET /api/analytics/memberships` — active/paused/cancelled, MRR, new30/churned30, churn % & retention.
+  - `GET /api/analytics/leaderboard?metric=revenue|jobs|rating` — sortable top-25 leaderboard with win-rate.
+  - `GET /api/analytics/realtime` — Today: in_progress, completed_today, revenue_today, new_finance_apps_today, funded_today (safe to poll every 30s).
+  - `GET /api/analytics/export.csv?report=…` — CSV export for revenue/technicians/marketing/financing/leaderboard.
+  - `POST /api/analytics/marketing-costs` — record spend per source for ROI.
+- ✅ **Frontend** `/app/frontend/src/pages/Analytics.jsx` — Recharts-powered executive dashboard:
+  - 8-tab strip (Overview / Revenue / Technicians / Marketing / Calls / Financing / Memberships / Leaderboard).
+  - Global date-range + branch filter in header; CSV export button.
+  - Overview: live banner (30s polled) + 8 KPI cards with Δ% chips + revenue AreaChart.
+  - Revenue: dual-axis LineChart (revenue $ + job count) with day/week/month toggle.
+  - Technicians: BarChart of revenue + sortable table.
+  - Marketing: PieChart by source + ROI table.
+  - Calls: 4 KPIs + animated funnel bars.
+  - Financing: 4 KPIs + funnel BarChart.
+  - Memberships: 8 KPI cards (MRR, retention, churn).
+  - Leaderboard: gold/silver/bronze top-3 styling, metric toggles.
+- ✅ Wired into `App.js` route `/app/analytics` + sidebar nav (owner / office_manager / accountant / super_admin).
+- ✅ Backend 20/20 pytest + frontend 100% (iteration 25). `retest_needed=False`.
+
 ### P1 — Remaining
 - Stripe Price IDs (`STRIPE_PRICE_STARTER`, `STRIPE_PRICE_LITE`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_ENTERPRISE`) for real billing — currently dev-mode flips plan locally.
 - Twilio SMS — backend wired & gated, awaiting credentials.
