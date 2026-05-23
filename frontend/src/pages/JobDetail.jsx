@@ -122,7 +122,7 @@ export default function JobDetail() {
                             <CreditCard size={16} /> Charge ${job.price.toFixed(0)}
                         </button>
                     )}
-                    {!job.paid && job.price >= 500 && (
+                    {!job.paid && job.price >= 4500 && (
                         <button onClick={() => { setFinanceResult(null); setShowFinance(true); }} data-testid="detail-finance-button"
                             className="flex items-center gap-1.5 px-4 py-2.5 border border-violet-500 text-violet-700 hover:bg-violet-50 font-semibold">
                             <Bank size={16} /> Finance this job
@@ -217,10 +217,26 @@ export default function JobDetail() {
 }
 
 function FinanceJobModal({ job, onClose, result, setResult }) {
-    const [term, setTerm] = useState(36);
+    const [term, setTerm] = useState(60);
     const [amount, setAmount] = useState(job.price || 0);
     const [creating, setCreating] = useState(false);
     const [sending, setSending] = useState(false);
+    const [programs, setPrograms] = useState([]);
+    const [programId, setProgramId] = useState("");
+    const [quote, setQuote] = useState(null);
+
+    useEffect(() => {
+        api.get("/financing/programs", { params: { active: true } })
+            .then(({ data }) => setPrograms(data))
+            .catch(() => {});
+    }, []);
+
+    useEffect(() => {
+        if (!programId || !amount) { setQuote(null); return; }
+        api.post("/financing/program-quote", { amount: Number(amount), program_id: programId })
+            .then(({ data }) => setQuote(data))
+            .catch(() => setQuote(null));
+    }, [programId, amount]);
 
     const create = async (sendSms = false) => {
         const setter = sendSms ? setSending : setCreating;
@@ -230,6 +246,7 @@ function FinanceJobModal({ job, onClose, result, setResult }) {
                 job_id: job.id,
                 amount: Number(amount),
                 term_months: Number(term),
+                program_id: programId || undefined,
                 send_sms: sendSms,
                 origin_url: window.location.origin,
             });
@@ -256,14 +273,21 @@ function FinanceJobModal({ job, onClose, result, setResult }) {
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 grid place-items-center p-4" onClick={onClose}>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4" onClick={(e) => e.stopPropagation()} data-testid="finance-job-modal">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} data-testid="finance-job-modal">
                 <div className="flex items-center justify-between">
                     <h2 className="font-bold text-lg flex items-center gap-2"><Bank size={20}/> Finance this job</h2>
                     <button onClick={onClose}><X size={20}/></button>
                 </div>
                 {!result && (
                     <>
-                        <p className="text-sm text-slate-500">Create a Fresh Cash application for <strong>{job.customer_name}</strong> and text them the link.</p>
+                        <p className="text-sm text-slate-500">Create a Fresh Cash application for <strong>{job.customer_name}</strong>.</p>
+                        <label className="text-xs block">Program
+                            <select value={programId} onChange={(e) => setProgramId(e.target.value)}
+                                className="w-full h-10 px-3 rounded border border-slate-300 text-sm mt-1" data-testid="finance-job-program">
+                                <option value="">— Default (Fresh Cash decisioning) —</option>
+                                {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                        </label>
                         <div className="grid grid-cols-2 gap-3">
                             <label className="text-xs block">Amount ($)
                                 <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
@@ -271,10 +295,17 @@ function FinanceJobModal({ job, onClose, result, setResult }) {
                             </label>
                             <label className="text-xs block">Term (months)
                                 <select value={term} onChange={(e) => setTerm(e.target.value)} className="w-full h-10 px-3 rounded border border-slate-300 text-sm mt-1" data-testid="finance-job-term">
-                                    {[12, 24, 36, 48, 60, 72, 84].map((t) => <option key={t}>{t}</option>)}
+                                    {[12, 24, 36, 48, 60, 72, 84, 120].map((t) => <option key={t}>{t}</option>)}
                                 </select>
                             </label>
                         </div>
+                        {quote && (
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-xs space-y-1" data-testid="finance-job-quote">
+                                <div className="flex justify-between"><span className="text-slate-600">Customer pays:</span><span className="font-mono font-bold">${quote.monthly_payment}/mo</span></div>
+                                <div className="flex justify-between"><span className="text-slate-600">Your net payout:</span><span className="font-mono font-bold text-emerald-700">${quote.net_payout.toLocaleString()}</span></div>
+                                <div className="flex justify-between"><span className="text-slate-600">Dealer fee:</span><span className="font-mono">${quote.contractor_fee_dollars} ({quote.dealer_fee_pct}%)</span></div>
+                            </div>
+                        )}
                         <div className="bg-violet-50 border border-violet-200 rounded-lg px-3 py-2 text-xs text-violet-900">
                             Soft credit check only — won't affect their score.
                         </div>

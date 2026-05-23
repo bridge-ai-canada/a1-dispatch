@@ -51,6 +51,7 @@ import TenantLanding from "./pages/TenantLanding";
 import FinancingApply from "./pages/FinancingApply";
 import FinancingContractor from "./pages/FinancingContractor";
 import FinancingAdmin from "./pages/FinancingAdmin";
+import FinancingPrograms from "./pages/FinancingPrograms";
 
 function HashGuard({ children }) {
     // Per Emergent Auth playbook: detect session_id synchronously during render
@@ -134,6 +135,7 @@ function App() {
                         <Route path="settings/api-keys" element={<ApiKeys />} />
                         <Route path="super/tenants" element={<SuperTenants />} />
                         <Route path="financing" element={<FinancingContractor />} />
+                        <Route path="financing/programs" element={<FinancingPrograms />} />
                         <Route path="admin/financing" element={<FinancingAdmin />} />
                     </Route>
 

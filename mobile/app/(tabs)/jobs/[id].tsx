@@ -103,8 +103,8 @@ export default function JobDetail() {
     };
 
     const financeThisJob = async () => {
-        if (!job?.price || job.price < 500) {
-            Alert.alert("Amount too small", "Financing is available for jobs $500 and up.");
+        if (!job?.price || job.price < 4500) {
+            Alert.alert("Amount too small", "Financing is available for jobs $4,500 and up.");
             return;
         }
         Alert.alert(
@@ -331,7 +331,7 @@ export default function JobDetail() {
                             </TouchableOpacity>
                         </>
                     )}
-                    {!job.paid && job.price >= 500 && (
+                    {!job.paid && job.price >= 4500 && (
                         <TouchableOpacity onPress={financeThisJob} disabled={busy}
                             style={[s.bigBtn, { backgroundColor: "#7C3AED", marginTop: 10, opacity: busy ? 0.5 : 1 }]}
                             testID="finance-this-job-btn">

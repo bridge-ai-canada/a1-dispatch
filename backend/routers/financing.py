@@ -24,7 +24,44 @@ router = APIRouter()
 class CalcIn(BaseModel):
     amount: float = Field(gt=0)
     apr: float = Field(ge=0)
-    term_months: int = Field(ge=1, le=120)
+    term_months: int = Field(ge=1, le=240)
+
+
+class ProgramQuoteIn(BaseModel):
+    amount: float = Field(gt=0)
+    program_id: Optional[str] = None
+    # OR pass program inline (without saving)
+    program: Optional[dict] = None
+
+
+class ProgramCreateIn(BaseModel):
+    key: Optional[str] = None
+    name: str
+    kind: Literal["standard", "buydown", "promo", "deferred"]
+    apr: float = Field(ge=0, default=9.99)
+    base_apr: Optional[float] = None
+    buydown_pct: Optional[float] = Field(default=0, ge=0, le=15)
+    dealer_fee_pct: float = Field(ge=0, le=30, default=4.5)
+    term_months: int = Field(ge=3, le=120, default=60)
+    amort_months: int = Field(ge=3, le=240, default=60)
+    promo_months: Optional[int] = None
+    defer_months: Optional[int] = None
+    defer_interest_accrues: Optional[bool] = True
+    active: bool = True
+
+
+class ProgramUpdateIn(BaseModel):
+    name: Optional[str] = None
+    apr: Optional[float] = None
+    base_apr: Optional[float] = None
+    buydown_pct: Optional[float] = None
+    dealer_fee_pct: Optional[float] = None
+    term_months: Optional[int] = None
+    amort_months: Optional[int] = None
+    promo_months: Optional[int] = None
+    defer_months: Optional[int] = None
+    defer_interest_accrues: Optional[bool] = None
+    active: Optional[bool] = None
 
 
 class ApplicationCreateIn(BaseModel):
@@ -33,11 +70,13 @@ class ApplicationCreateIn(BaseModel):
     customer_email: Optional[EmailStr] = None
     customer_phone: Optional[str] = None
     address: Optional[str] = ""
-    amount: float = Field(gt=0)
-    term_months: int = Field(ge=6, le=84, default=36)
+    amount: float = Field(gt=fc.MIN_AMOUNT - 0.01)
+    term_months: int = Field(ge=3, le=120, default=60)
+    program_id: Optional[str] = None        # link to a saved financing program
     estimate_id: Optional[str] = None
     invoice_id: Optional[str] = None
     branch_id: Optional[str] = None
+    project_description: Optional[str] = ""
     notes: Optional[str] = ""
 
 
@@ -48,11 +87,20 @@ class ApplicantDetailsIn(BaseModel):
     email: EmailStr
     phone: str
     dob: str  # ISO date string
-    ssn4: str  # last-4 only
+    ssn4: Optional[str] = None       # last-4 only (US)
+    sin: Optional[str] = None        # Canadian SIN (encrypted at rest in real impl)
+    address: Optional[str] = ""
+    city: Optional[str] = ""
+    state: Optional[str] = ""
+    postal_code: Optional[str] = ""
+    home_ownership: Optional[Literal["own", "rent", "other"]] = None
     fico_bucket: Literal["excellent", "good", "fair", "poor", "subprime", "unknown"] = "unknown"
     monthly_income: float = Field(ge=0)
     monthly_obligations: float = Field(ge=0)
     employment_status: Literal["full_time", "part_time", "self_employed", "retired", "unemployed"] = "full_time"
+    employer_name: Optional[str] = ""
+    years_employed: Optional[float] = None
+    project_description: Optional[str] = ""
     consent_soft_pull: bool
 
 
@@ -131,6 +179,96 @@ async def financing_ladder(user: dict = Depends(get_current_user)):
     ]
 
 
+# -------------------- Financing Programs --------------------
+async def _seed_programs_for(company_id: str):
+    existing = {p["key"] async for p in db.finance_programs.find(
+        {"company_id": company_id}, {"_id": 0, "key": 1},
+    )}
+    docs = []
+    for tpl in fc.DEFAULT_PROGRAMS:
+        if tpl["key"] in existing:
+            continue
+        docs.append({
+            "id": str(uuid.uuid4()),
+            "company_id": company_id,
+            **tpl,
+            "created_at": now_iso(),
+        })
+    if docs:
+        await db.finance_programs.insert_many(docs)
+
+
+@router.get("/financing/programs")
+async def list_programs(user: dict = Depends(get_current_user), kind: Optional[str] = None, active: Optional[bool] = None):
+    await _seed_programs_for(user["company_id"])
+    q = {"company_id": user["company_id"]}
+    if kind:
+        q["kind"] = kind
+    if active is not None:
+        q["active"] = active
+    return await db.finance_programs.find(q, {"_id": 0}).sort("created_at", 1).to_list(500)
+
+
+@router.post("/financing/programs")
+async def create_program(body: ProgramCreateIn, user: dict = Depends(require_role("owner", "super_admin"))):
+    doc = {
+        "id": str(uuid.uuid4()),
+        "company_id": user["company_id"],
+        "key": body.key or f"custom_{secrets.token_hex(4)}",
+        "is_system_default": False,
+        "created_at": now_iso(),
+        **body.model_dump(exclude_none=True),
+    }
+    # Uniqueness within tenant
+    if await db.finance_programs.find_one({"company_id": user["company_id"], "key": doc["key"]}):
+        raise HTTPException(status_code=409, detail="A program with that key exists")
+    await db.finance_programs.insert_one(doc)
+    await log_activity(user, "finance.program_created", meta={"id": doc["id"], "name": doc["name"]})
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+
+@router.patch("/financing/programs/{program_id}")
+async def update_program(program_id: str, body: ProgramUpdateIn, user: dict = Depends(require_role("owner", "super_admin"))):
+    payload = body.model_dump(exclude_unset=True, exclude_none=True)
+    if payload:
+        res = await db.finance_programs.update_one(
+            {"id": program_id, "company_id": user["company_id"]}, {"$set": payload},
+        )
+        if res.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Program not found")
+    return await db.finance_programs.find_one({"id": program_id}, {"_id": 0})
+
+
+@router.delete("/financing/programs/{program_id}")
+async def delete_program(program_id: str, user: dict = Depends(require_role("owner", "super_admin"))):
+    prog = await db.finance_programs.find_one({"id": program_id, "company_id": user["company_id"]}, {"_id": 0})
+    if not prog:
+        raise HTTPException(status_code=404, detail="Program not found")
+    if prog.get("is_system_default"):
+        # Soft-disable instead of hard delete
+        await db.finance_programs.update_one({"id": program_id}, {"$set": {"active": False}})
+        return {"ok": True, "soft_disabled": True}
+    await db.finance_programs.delete_one({"id": program_id})
+    return {"ok": True}
+
+
+@router.post("/financing/program-quote")
+async def program_quote(body: ProgramQuoteIn, user: dict = Depends(get_current_user)):
+    """Quote a financed amount against a saved program (by id) or an inline program dict."""
+    program = None
+    if body.program_id:
+        program = await db.finance_programs.find_one(
+            {"id": body.program_id, "company_id": user["company_id"]}, {"_id": 0},
+        )
+        if not program:
+            raise HTTPException(status_code=404, detail="Program not found")
+    elif body.program:
+        program = body.program
+    else:
+        raise HTTPException(status_code=400, detail="Provide program_id or program")
+    return fc.program_quote(body.amount, program)
+
+
 # -------------------- Contractor: create application --------------------
 @router.post("/financing/applications")
 async def create_application(
@@ -150,6 +288,8 @@ async def create_application(
         "address": body.address,
         "amount": float(body.amount),
         "term_months": int(body.term_months),
+        "program_id": body.program_id,
+        "project_description": body.project_description,
         "estimate_id": body.estimate_id,
         "invoice_id": body.invoice_id,
         "status": "started",            # started → submitted → decisioned → signed → funded
@@ -201,7 +341,8 @@ async def get_application(app_id: str, user: dict = Depends(get_current_user)):
 class JobFinanceIn(BaseModel):
     job_id: str
     amount: Optional[float] = None  # defaults to job.price
-    term_months: int = Field(ge=6, le=84, default=36)
+    term_months: int = Field(ge=3, le=120, default=60)
+    program_id: Optional[str] = None
     send_sms: bool = False
     origin_url: Optional[str] = None  # used to build the customer link in SMS
 
@@ -243,6 +384,7 @@ async def create_from_job(
             "address": job.get("address", ""),
             "amount": amount,
             "term_months": int(body.term_months),
+            "program_id": body.program_id,
             "estimate_id": None,
             "invoice_id": None,
             "job_id": body.job_id,
@@ -285,10 +427,32 @@ async def create_from_job(
                 ) or {}
                 brand = company.get("branding") or {}
                 app_name = brand.get("app_name") or company.get("name") or "We"
-                text = (
-                    f"{app_name}: Pay over time for your service "
-                    f"(${int(amount)})! Apply in 60 seconds (soft credit check only): {apply_url}"
-                )
+                # If we have a program, compute an estimated payment for a smarter pitch
+                est_pmt = None
+                if doc.get("program_id"):
+                    prog = await db.finance_programs.find_one(
+                        {"id": doc["program_id"], "company_id": user["company_id"]}, {"_id": 0},
+                    )
+                    if prog:
+                        try:
+                            q = fc.program_quote(amount, prog)
+                            est_pmt = q.get("monthly_payment")
+                        except Exception:
+                            est_pmt = None
+                if est_pmt and est_pmt > 0:
+                    cmp_label = next(
+                        (lab for lab, thr in sorted(_COMPARISONS, key=lambda x: -x[1]) if est_pmt >= thr),
+                        "a couple coffees a week",
+                    )
+                    text = (
+                        f"{app_name}: ${int(amount):,} financed at about ${est_pmt:.0f}/mo — "
+                        f"less than {cmp_label}! Apply (soft pull): {apply_url}"
+                    )
+                else:
+                    text = (
+                        f"{app_name}: Pay over time for your service "
+                        f"(${int(amount):,})! Apply in 60 seconds (soft credit check only): {apply_url}"
+                    )
                 import asyncio
                 sms_result = await asyncio.to_thread(sms_service.send_sms, phone, text)
                 await db.sms_log.insert_one({
@@ -726,3 +890,52 @@ async def admin_metrics(user: dict = Depends(require_role("super_admin"))):
         "total_funded": (funded_agg[0]["total"] if funded_agg else 0) or 0,
         "funding_events": (funded_agg[0]["count"] if funded_agg else 0) or 0,
     }
+
+
+# -------------------- AI pitch SMS templates --------------------
+class PitchIn(BaseModel):
+    application_id: Optional[str] = None
+    amount: float = Field(gt=0)
+    monthly_payment: float = Field(gt=0)
+    term_months: int
+    apr: Optional[float] = 0
+
+
+_COMPARISONS = [
+    ("a streaming bundle and weekly takeout",  35),
+    ("two restaurant dinners",                 85),
+    ("a daily coffee habit",                   125),
+    ("a basic phone plan",                     65),
+    ("two tanks of gas",                       100),
+    ("a monthly gym + streaming combo",        55),
+    ("a family pizza night each week",         180),
+]
+
+
+@router.post("/financing/ai/pitch")
+async def generate_pitch(body: PitchIn, user: dict = Depends(get_current_user)):
+    """Generate a personalized SMS pitch comparing the monthly payment to relatable
+    spending. Template-based + branding-aware (no LLM cost, deterministic for tests)."""
+    company = await db.companies.find_one(
+        {"id": user["company_id"]}, {"_id": 0, "name": 1, "branding": 1},
+    ) or {}
+    brand = company.get("branding") or {}
+    app_name = brand.get("app_name") or company.get("name") or "We"
+    # Pick the comparison closest to (but <= than) the monthly payment
+    mp = float(body.monthly_payment)
+    cmp_label = next(
+        (label for label, threshold in sorted(_COMPARISONS, key=lambda x: -x[1]) if mp >= threshold),
+        "a couple coffees a week",
+    )
+    pitches = [
+        f"{app_name}: You're approved! ${int(body.amount):,} financed at just ${mp:.0f}/mo — about the same as {cmp_label}. Lock it in: ",
+        f"{app_name}: Great news — ${mp:.0f}/mo for {body.term_months} months gets you the full ${int(body.amount):,} project. That's less than {cmp_label}! Apply now: ",
+        f"{app_name}: ${mp:.0f}/mo over {body.term_months} months — easier on the wallet than {cmp_label}. Tap to accept: ",
+    ]
+    return {
+        "pitches": pitches,
+        "default": pitches[0],
+        "comparison_used": cmp_label,
+    }
+
+

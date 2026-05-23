@@ -25,6 +25,7 @@ const baseNav = [
     { to: "/app/invoices", label: "Invoices", icon: Receipt, roles: ["owner","dispatcher","office_manager","accountant"] },
     { to: "/app/templates", label: "Templates", icon: Stack, roles: ["owner","office_manager"] },
     { to: "/app/financing", label: "Financing", icon: Bank, roles: ["owner","dispatcher","office_manager","sales_rep","csr","accountant"] },
+    { to: "/app/financing/programs", label: "Finance programs", icon: Bank, roles: ["owner","super_admin"] },
     { to: "/app/admin/financing", label: "Finance admin", icon: Bank, roles: ["super_admin"] },
     { to: "/app/ai", label: "AI Assistant", icon: Sparkle, roles: ["owner","dispatcher","office_manager"] },
     { to: "/app/my-jobs", label: "My Jobs", icon: DeviceMobile, roles: ["owner","dispatcher","technician"] },

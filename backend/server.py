@@ -107,6 +107,8 @@ async def startup():
     await db.finance_buydowns.create_index([("company_id", 1), ("created_at", -1)])
     await db.finance_funding_events.create_index([("company_id", 1), ("created_at", -1)])
     await db.finance_rentals.create_index([("company_id", 1), ("status", 1)])
+    await db.finance_programs.create_index([("company_id", 1), ("key", 1)], unique=True)
+    await db.finance_programs.create_index([("company_id", 1), ("active", 1), ("kind", 1)])
     # one-time migration: legacy "scheduled" status -> "scheduled_installation"
     await db.jobs.update_many(
         {"status": "scheduled"},

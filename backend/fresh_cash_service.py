@@ -39,11 +39,12 @@ FICO_BUCKETS = {
     "unknown":   680,  # neutral assumption
 }
 
-MIN_AMOUNT = 500.0
-MAX_AMOUNT = 75000.0
-MIN_TERM = 6
-MAX_TERM = 84
+MIN_AMOUNT = 4500.0
+MAX_AMOUNT = 150000.0
+MIN_TERM = 3
+MAX_TERM = 120
 DTI_LIMIT = 0.45  # debt-to-income cap
+MAX_AMORT = 240   # months (20 years) — used by long-amort programs
 
 
 # -------------------- Bureau adapter --------------------
@@ -143,6 +144,184 @@ def amortization_schedule(principal: float, apr: float, term_months: int) -> lis
 def total_finance_charge(principal: float, apr: float, term_months: int) -> float:
     pmt = monthly_payment(principal, apr, term_months)
     return round(pmt * term_months - principal, 2)
+
+
+# -------------------- Program-aware quote --------------------
+# Programs describe the deal structure (Standard / Buy-Down / 0% Promo / Deferred)
+# and let admins shape contractor economics. A "term" is what the customer pays;
+# "amortization" is the schedule used to compute the monthly payment — a balloon
+# at the end of the term covers the remaining balance.
+def program_quote(amount: float, program: dict) -> dict:
+    """Compute the payment economics for an `amount` against a financing program.
+
+    program dict shape:
+      - kind: "standard" | "buydown" | "promo" | "deferred"
+      - apr: customer APR (post-buydown)
+      - base_apr: pre-buydown APR (for buydown programs); else None
+      - buydown_pct: how many APR points the contractor bought down (0 if N/A)
+      - dealer_fee_pct: contractor fee as % of financed amount (e.g., 4.5)
+      - term_months: customer payback term
+      - amort_months: amortization schedule length (>= term_months). Balloon at end of term.
+      - promo_months: if kind=='promo', equal-payment 0% term (3/6/12/18/24)
+      - defer_months: months of payment deferral (kind=='deferred')
+      - defer_interest_accrues: True = interest accrues during deferral
+    """
+    amount = float(amount or 0)
+    kind = (program.get("kind") or "standard").lower()
+    dealer_fee_pct = float(program.get("dealer_fee_pct") or 0)
+    contractor_fee_dollars = round(amount * (dealer_fee_pct / 100.0), 2)
+    net_payout = round(amount - contractor_fee_dollars, 2)
+    quote = {
+        "kind": kind,
+        "amount": amount,
+        "dealer_fee_pct": dealer_fee_pct,
+        "contractor_fee_dollars": contractor_fee_dollars,
+        "net_payout": net_payout,
+    }
+
+    if kind == "promo":
+        # 0% equal-payment plan over promo_months
+        promo_months = int(program.get("promo_months") or 12)
+        pmt = round(amount / promo_months, 2)
+        quote.update({
+            "apr": 0.0, "base_apr": None, "buydown_pct": 0.0,
+            "term_months": promo_months, "amort_months": promo_months,
+            "monthly_payment": pmt, "balloon_payment": 0.0,
+            "total_interest": 0.0,
+            "total_payback": round(pmt * promo_months, 2),
+            "promo_months": promo_months,
+        })
+        return quote
+
+    if kind == "deferred":
+        defer_months = int(program.get("defer_months") or 6)
+        apr = float(program.get("apr") or 9.99)
+        term = int(program.get("term_months") or 60)
+        amort = int(program.get("amort_months") or term)
+        interest_accrues = bool(program.get("defer_interest_accrues", True))
+        # If interest accrues during the deferral, balance grows; payments start after deferral.
+        start_principal = amount
+        if interest_accrues and apr > 0:
+            r = (apr / 100.0) / 12.0
+            start_principal = round(amount * ((1 + r) ** defer_months), 2)
+        amort_pmt = monthly_payment(start_principal, apr, amort)
+        # Balloon when amort > term (payments only for `term` months after deferral)
+        balance_after_term = _balance_after(start_principal, apr, amort_pmt, term)
+        quote.update({
+            "apr": apr, "base_apr": None, "buydown_pct": 0.0,
+            "term_months": term + defer_months, "amort_months": amort,
+            "monthly_payment": amort_pmt,
+            "defer_months": defer_months,
+            "defer_interest_accrues": interest_accrues,
+            "balance_after_deferral": start_principal,
+            "balloon_payment": round(balance_after_term, 2) if amort > term else 0.0,
+            "total_interest": round(amort_pmt * term + balance_after_term - amount, 2),
+            "total_payback": round(amort_pmt * term + balance_after_term, 2),
+        })
+        return quote
+
+    # standard or buydown — uses term/amort + apr
+    apr = float(program.get("apr") or 9.99)
+    base_apr = program.get("base_apr")
+    buydown_pct = float(program.get("buydown_pct") or 0)
+    term = int(program.get("term_months") or 60)
+    amort = int(program.get("amort_months") or term)
+    amort_pmt = monthly_payment(amount, apr, amort)
+    balance_after_term = _balance_after(amount, apr, amort_pmt, term)
+    # Customer savings vs base_apr (for buydown programs)
+    customer_savings = 0.0
+    if base_apr and base_apr > apr:
+        base_pmt = monthly_payment(amount, float(base_apr), amort)
+        customer_savings = round((base_pmt - amort_pmt) * term, 2)
+    quote.update({
+        "apr": apr, "base_apr": base_apr, "buydown_pct": buydown_pct,
+        "term_months": term, "amort_months": amort,
+        "monthly_payment": amort_pmt,
+        "balloon_payment": round(balance_after_term, 2) if amort > term else 0.0,
+        "total_interest": round(amort_pmt * term + balance_after_term - amount, 2),
+        "total_payback": round(amort_pmt * term + balance_after_term, 2),
+        "customer_savings_vs_base": customer_savings,
+    })
+    return quote
+
+
+def _balance_after(principal: float, apr: float, payment: float, months: int) -> float:
+    """Remaining balance after `months` payments at `payment` and `apr`."""
+    if months <= 0:
+        return round(principal, 2)
+    r = (apr / 100.0) / 12.0
+    if r <= 0:
+        return max(0.0, round(principal - payment * months, 2))
+    bal = principal
+    for _ in range(months):
+        interest = bal * r
+        bal = bal + interest - payment
+        if bal < 0:
+            return 0.0
+    return round(bal, 2)
+
+
+# -------------------- Default programs catalog --------------------
+# Companies are seeded with these. Admins can edit/add per-tenant.
+DEFAULT_PROGRAMS = [
+    # Standard APR programs
+    {"key": "std_60_120", "name": "Standard 60mo / 120mo amort", "kind": "standard",
+     "apr": 9.99, "dealer_fee_pct": 4.5, "term_months": 60, "amort_months": 120,
+     "active": True, "is_system_default": True},
+    {"key": "std_60_180", "name": "Standard 60mo / 180mo amort", "kind": "standard",
+     "apr": 11.99, "dealer_fee_pct": 5.5, "term_months": 60, "amort_months": 180,
+     "active": True, "is_system_default": True},
+    {"key": "std_60_240", "name": "Standard 60mo / 240mo amort", "kind": "standard",
+     "apr": 12.99, "dealer_fee_pct": 6.5, "term_months": 60, "amort_months": 240,
+     "active": True, "is_system_default": True},
+    {"key": "std_36_180", "name": "Standard 36mo / 180mo amort", "kind": "standard",
+     "apr": 10.99, "dealer_fee_pct": 5.0, "term_months": 36, "amort_months": 180,
+     "active": True, "is_system_default": True},
+    {"key": "std_84_240", "name": "Standard 84mo / 240mo amort", "kind": "standard",
+     "apr": 11.99, "dealer_fee_pct": 6.0, "term_months": 84, "amort_months": 240,
+     "active": True, "is_system_default": True},
+    {"key": "std_120_240", "name": "Standard 120mo / 240mo amort", "kind": "standard",
+     "apr": 13.99, "dealer_fee_pct": 7.0, "term_months": 120, "amort_months": 240,
+     "active": True, "is_system_default": True},
+    # Buy-down programs
+    {"key": "bd_13_99_to_9_99", "name": "Buy-down 13.99% → 9.99%", "kind": "buydown",
+     "apr": 9.99, "base_apr": 13.99, "buydown_pct": 4.0, "dealer_fee_pct": 8.0,
+     "term_months": 60, "amort_months": 120,
+     "active": True, "is_system_default": True},
+    {"key": "bd_13_99_to_7_99", "name": "Buy-down 13.99% → 7.99%", "kind": "buydown",
+     "apr": 7.99, "base_apr": 13.99, "buydown_pct": 6.0, "dealer_fee_pct": 12.0,
+     "term_months": 60, "amort_months": 120,
+     "active": True, "is_system_default": True},
+    # 0% Promotional plans (equal payments)
+    {"key": "promo_3", "name": "0% / 3-month equal payments", "kind": "promo",
+     "promo_months": 3, "dealer_fee_pct": 4.0, "apr": 0.0,
+     "active": True, "is_system_default": True},
+    {"key": "promo_6", "name": "0% / 6-month equal payments", "kind": "promo",
+     "promo_months": 6, "dealer_fee_pct": 6.0, "apr": 0.0,
+     "active": True, "is_system_default": True},
+    {"key": "promo_12", "name": "0% / 12-month equal payments", "kind": "promo",
+     "promo_months": 12, "dealer_fee_pct": 8.0, "apr": 0.0,
+     "active": True, "is_system_default": True},
+    {"key": "promo_18", "name": "0% / 18-month equal payments", "kind": "promo",
+     "promo_months": 18, "dealer_fee_pct": 10.0, "apr": 0.0,
+     "active": True, "is_system_default": True},
+    {"key": "promo_24", "name": "0% / 24-month equal payments", "kind": "promo",
+     "promo_months": 24, "dealer_fee_pct": 12.0, "apr": 0.0,
+     "active": True, "is_system_default": True},
+    # Deferred-payment plans
+    {"key": "defer_3", "name": "3-month deferred / 60mo standard", "kind": "deferred",
+     "defer_months": 3, "defer_interest_accrues": True,
+     "apr": 9.99, "dealer_fee_pct": 5.5, "term_months": 60, "amort_months": 60,
+     "active": True, "is_system_default": True},
+    {"key": "defer_6", "name": "6-month deferred / 60mo standard", "kind": "deferred",
+     "defer_months": 6, "defer_interest_accrues": True,
+     "apr": 9.99, "dealer_fee_pct": 7.0, "term_months": 60, "amort_months": 60,
+     "active": True, "is_system_default": True},
+    {"key": "defer_6_int_free", "name": "6-month deferred / no interest accrual", "kind": "deferred",
+     "defer_months": 6, "defer_interest_accrues": False,
+     "apr": 9.99, "dealer_fee_pct": 10.0, "term_months": 60, "amort_months": 60,
+     "active": True, "is_system_default": True},
+]
 
 
 # -------------------- Tier select + decision --------------------

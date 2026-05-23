@@ -218,50 +218,64 @@ function NewRentalModal({ onClose, onCreated }) {
 }
 
 function CalcModal({ onClose }) {
-    const [amount, setAmount] = useState(5000);
-    const [apr, setApr] = useState(9.99);
-    const [term, setTerm] = useState(36);
+    const [amount, setAmount] = useState(15000);
+    const [programs, setPrograms] = useState([]);
+    const [programId, setProgramId] = useState("");
     const [result, setResult] = useState(null);
-    const calc = async () => {
-        try {
-            const { data } = await api.post("/financing/calculate", { amount: Number(amount), apr: Number(apr), term_months: Number(term) });
-            setResult(data);
-        } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
-    };
-    useEffect(() => { calc(); /* eslint-disable-next-line */ }, [amount, apr, term]);
+
+    useEffect(() => {
+        api.get("/financing/programs", { params: { active: true } })
+            .then(({ data }) => { setPrograms(data); if (!programId && data.length) setProgramId(data[0].id); })
+            .catch(() => {});
+    }, []); // eslint-disable-line
+
+    useEffect(() => {
+        if (!programId) return;
+        api.post("/financing/program-quote", { amount: Number(amount), program_id: programId })
+            .then(({ data }) => setResult(data))
+            .catch((e) => toast.error(formatApiError(e.response?.data?.detail)));
+    }, [amount, programId]);
+
+    const cur = programs.find((p) => p.id === programId);
+
     return (
-        <Modal title="Monthly payment calculator" onClose={onClose} testid="fin-calc-modal">
-            <div className="grid grid-cols-3 gap-2">
+        <Modal title="Live financing calculator" onClose={onClose} testid="fin-calc-modal">
+            <div className="grid grid-cols-2 gap-2">
                 <label className="text-xs">Amount<input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full h-10 px-3 rounded border border-slate-300 text-sm mt-1" data-testid="calc-amount"/></label>
-                <label className="text-xs">APR %<input type="number" step="0.01" value={apr} onChange={(e) => setApr(e.target.value)} className="w-full h-10 px-3 rounded border border-slate-300 text-sm mt-1" data-testid="calc-apr"/></label>
-                <label className="text-xs">Term<input type="number" value={term} onChange={(e) => setTerm(e.target.value)} className="w-full h-10 px-3 rounded border border-slate-300 text-sm mt-1" data-testid="calc-term"/></label>
+                <label className="text-xs">Program
+                    <select value={programId} onChange={(e) => setProgramId(e.target.value)} className="w-full h-10 px-3 rounded border border-slate-300 text-sm mt-1" data-testid="calc-program">
+                        {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                </label>
             </div>
+            {cur && (
+                <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                    {cur.kind === "promo" ? `0% / ${cur.promo_months}mo equal pay` :
+                     cur.kind === "deferred" ? `${cur.apr}% · ${cur.term_months}mo · ${cur.defer_months}mo deferral` :
+                     `${cur.apr}% · ${cur.term_months}mo term${cur.amort_months !== cur.term_months ? ` / ${cur.amort_months}mo amort` : ""}`}
+                </div>
+            )}
             {result && (
                 <>
                     <div className="bg-slate-50 rounded-xl p-4 grid grid-cols-2 gap-2 text-center" data-testid="calc-result">
-                        <div><div className="text-3xl font-extrabold">{fmt$(result.monthly_payment)}</div><div className="text-[10px] uppercase">monthly</div></div>
-                        <div><div className="text-3xl font-extrabold">{fmt$(result.total_finance_charge)}</div><div className="text-[10px] uppercase">total interest</div></div>
+                        <div><div className="text-3xl font-extrabold">{fmt$(result.monthly_payment)}</div><div className="text-[10px] uppercase">monthly payment</div></div>
+                        <div><div className="text-3xl font-extrabold text-green-700">{fmt$(result.net_payout)}</div><div className="text-[10px] uppercase">your payout</div></div>
                     </div>
-                    <div className="max-h-60 overflow-y-auto border border-slate-200 rounded">
-                        <table className="w-full text-xs">
-                            <thead className="bg-slate-50 sticky top-0"><tr><th className="p-2 text-left">#</th><th className="p-2 text-right">Payment</th><th className="p-2 text-right">Principal</th><th className="p-2 text-right">Interest</th><th className="p-2 text-right">Balance</th></tr></thead>
-                            <tbody>
-                                {result.schedule.map((r) => (
-                                    <tr key={r.n} className="border-t border-slate-100">
-                                        <td className="p-2">{r.n}</td>
-                                        <td className="p-2 text-right font-mono">{fmt$(r.payment)}</td>
-                                        <td className="p-2 text-right font-mono">{fmt$(r.principal)}</td>
-                                        <td className="p-2 text-right font-mono">{fmt$(r.interest)}</td>
-                                        <td className="p-2 text-right font-mono">{fmt$(r.balance)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                        <Row label="Dealer fee" value={`${result.dealer_fee_pct}% · ${fmt$(result.contractor_fee_dollars)}`}/>
+                        {result.balloon_payment > 0 && <Row label="Balloon at term end" value={fmt$(result.balloon_payment)}/>}
+                        <Row label="Total interest" value={fmt$(result.total_interest || 0)}/>
+                        <Row label="Total payback" value={fmt$(result.total_payback || 0)}/>
+                        {result.customer_savings_vs_base > 0 && <Row label="Customer savings vs base APR" value={fmt$(result.customer_savings_vs_base)}/>}
                     </div>
                 </>
             )}
         </Modal>
     );
+}
+
+function Row({ label, value }) {
+    return <div className="flex justify-between bg-white px-3 py-2 rounded border border-slate-200"><span className="text-slate-500">{label}</span><span className="font-mono font-bold">{value}</span></div>;
 }
 
 function BuydownModal({ app, onClose, onApplied }) {
