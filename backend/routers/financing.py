@@ -198,6 +198,122 @@ async def get_application(app_id: str, user: dict = Depends(get_current_user)):
     return app
 
 
+class JobFinanceIn(BaseModel):
+    job_id: str
+    amount: Optional[float] = None  # defaults to job.price
+    term_months: int = Field(ge=6, le=84, default=36)
+    send_sms: bool = False
+    origin_url: Optional[str] = None  # used to build the customer link in SMS
+
+
+@router.post("/financing/from-job")
+async def create_from_job(
+    body: JobFinanceIn,
+    user: dict = Depends(require_role("owner", "dispatcher", "office_manager", "sales_rep", "csr", "technician", "super_admin")),
+):
+    """Create a financing application from a Job. Designed for techs in the field —
+    optionally text the link to the customer right away. Idempotent per job."""
+    job = await db.jobs.find_one(
+        {"id": body.job_id, "company_id": user["company_id"]}, {"_id": 0},
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    amount = float(body.amount if body.amount is not None else (job.get("price") or 0))
+    if amount < fc.MIN_AMOUNT:
+        raise HTTPException(status_code=400, detail=f"Amount too small to finance (min ${fc.MIN_AMOUNT})")
+
+    # Idempotent: if a finance app already exists for this job, reuse it
+    existing = await db.finance_applications.find_one(
+        {"company_id": user["company_id"], "job_id": body.job_id}, {"_id": 0},
+    )
+    if existing:
+        doc = existing
+    else:
+        aid = str(uuid.uuid4())
+        token = _public_token()
+        doc = {
+            "id": aid,
+            "company_id": user["company_id"],
+            "created_by": user["id"],
+            "branch_id": job.get("branch_id"),
+            "customer_name": job.get("customer_name", ""),
+            "customer_email": job.get("customer_email"),
+            "customer_phone": job.get("customer_phone"),
+            "address": job.get("address", ""),
+            "amount": amount,
+            "term_months": int(body.term_months),
+            "estimate_id": None,
+            "invoice_id": None,
+            "job_id": body.job_id,
+            "status": "started", "decision": None, "score": None, "bureau": None,
+            "tier": None, "offer": None, "applicant": None, "signed": None,
+            "public_token": token,
+            "notes": f"Created from job {job.get('title') or job['id'][:8]}",
+            "created_at": now_iso(), "updated_at": now_iso(),
+            "source": "job",
+        }
+        await db.finance_applications.insert_one(doc)
+        # Link back to the job
+        await db.jobs.update_one(
+            {"id": body.job_id, "company_id": user["company_id"]},
+            {"$set": {"financing_application_id": aid}},
+        )
+        await log_activity(user, "finance.from_job",
+                           meta={"job_id": body.job_id, "application_id": aid, "amount": amount})
+
+    # Send SMS if requested and we have a phone + Twilio configured
+    sms_result = None
+    if body.send_sms:
+        import sms_service
+        from urllib.parse import urlparse
+        phone = doc.get("customer_phone")
+        if not phone:
+            sms_result = {"ok": False, "error": "no_customer_phone"}
+        elif not sms_service.is_enabled():
+            sms_result = {"ok": False, "error": "twilio_not_configured"}
+        else:
+            # Build the public link from origin_url (frontend) or FRONTEND_URL env fallback
+            from deps import FRONTEND_URL
+            base = (body.origin_url or FRONTEND_URL or "").rstrip("/")
+            if not base:
+                sms_result = {"ok": False, "error": "no_origin_url"}
+            else:
+                apply_url = f"{base}/finance/{doc['public_token']}"
+                company = await db.companies.find_one(
+                    {"id": user["company_id"]}, {"_id": 0, "name": 1, "branding": 1},
+                ) or {}
+                brand = company.get("branding") or {}
+                app_name = brand.get("app_name") or company.get("name") or "We"
+                text = (
+                    f"{app_name}: Pay over time for your service "
+                    f"(${int(amount)})! Apply in 60 seconds (soft credit check only): {apply_url}"
+                )
+                import asyncio
+                sms_result = await asyncio.to_thread(sms_service.send_sms, phone, text)
+                await db.sms_log.insert_one({
+                    "company_id": user["company_id"],
+                    "sent_by": user["id"],
+                    "to": phone,
+                    "body": text[:500],
+                    "job_id": body.job_id,
+                    "customer_id": job.get("customer_id"),
+                    "ok": sms_result.get("ok", False),
+                    "sid": sms_result.get("sid"),
+                    "error": sms_result.get("error"),
+                    "kind": "finance_offer",
+                    "created_at": now_iso(),
+                })
+
+    return {
+        "application_id": doc["id"],
+        "public_token": doc["public_token"],
+        "amount": doc["amount"],
+        "term_months": doc["term_months"],
+        "sms_result": sms_result,
+    }
+
+
 # -------------------- Public customer-portal endpoints --------------------
 @router.post("/public/estimates/{estimate_token}/finance")
 async def public_finance_from_estimate(estimate_token: str, payload: dict = None):

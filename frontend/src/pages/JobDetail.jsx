@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
     ArrowLeft, Camera, Trash, CreditCard, FloppyDisk, PencilSimple, Eraser,
     MapPin, Phone, Clock, CheckCircle, PlayCircle, UploadSimple,
+    Bank, Copy, ChatText, X,
 } from "@phosphor-icons/react";
 import { AIPolishButton, AIActionButton } from "../components/AIAssist";
 
@@ -30,6 +31,8 @@ export default function JobDetail() {
     const [notes, setNotes] = useState("");
     const [savingNotes, setSavingNotes] = useState(false);
     const [team, setTeam] = useState([]);
+    const [showFinance, setShowFinance] = useState(false);
+    const [financeResult, setFinanceResult] = useState(null);
 
     const load = () => {
         api.get(`/jobs/${id}`).then((r) => { setJob(r.data); setNotes(r.data.description || ""); });
@@ -119,6 +122,12 @@ export default function JobDetail() {
                             <CreditCard size={16} /> Charge ${job.price.toFixed(0)}
                         </button>
                     )}
+                    {!job.paid && job.price >= 500 && (
+                        <button onClick={() => { setFinanceResult(null); setShowFinance(true); }} data-testid="detail-finance-button"
+                            className="flex items-center gap-1.5 px-4 py-2.5 border border-violet-500 text-violet-700 hover:bg-violet-50 font-semibold">
+                            <Bank size={16} /> Finance this job
+                        </button>
+                    )}
                     {STATUS_NEXT[job.status] && (
                         <button onClick={advance} data-testid="detail-advance-status-button"
                             className="flex items-center gap-1.5 px-4 py-2.5 bg-[#1D4ED8] text-white hover:bg-[#1E40AF] font-semibold">
@@ -198,6 +207,107 @@ export default function JobDetail() {
                 <div className="space-y-6">
                     <SignaturePad job={job} onSaved={load} />
                 </div>
+            </div>
+
+            {showFinance && (
+                <FinanceJobModal job={job} onClose={() => setShowFinance(false)} result={financeResult} setResult={setFinanceResult} />
+            )}
+        </div>
+    );
+}
+
+function FinanceJobModal({ job, onClose, result, setResult }) {
+    const [term, setTerm] = useState(36);
+    const [amount, setAmount] = useState(job.price || 0);
+    const [creating, setCreating] = useState(false);
+    const [sending, setSending] = useState(false);
+
+    const create = async (sendSms = false) => {
+        const setter = sendSms ? setSending : setCreating;
+        setter(true);
+        try {
+            const { data } = await api.post("/financing/from-job", {
+                job_id: job.id,
+                amount: Number(amount),
+                term_months: Number(term),
+                send_sms: sendSms,
+                origin_url: window.location.origin,
+            });
+            setResult(data);
+            if (sendSms) {
+                if (data.sms_result?.ok) toast.success(`Text sent to ${job.customer_phone}`);
+                else if (data.sms_result?.error === "twilio_not_configured") toast.error("Twilio not configured — copy the link to share manually.");
+                else if (data.sms_result?.error === "no_customer_phone") toast.error("Customer has no phone on file.");
+                else if (data.sms_result?.error) toast.error(`SMS failed: ${data.sms_result.error}`);
+                else toast.success("Application created");
+            } else {
+                toast.success("Application created");
+            }
+        } catch (e) {
+            toast.error(formatApiError(e.response?.data?.detail));
+        } finally { setter(false); }
+    };
+
+    const publicUrl = result ? `${window.location.origin}/finance/${result.public_token}` : "";
+    const copy = () => {
+        navigator.clipboard.writeText(publicUrl).catch(() => {});
+        toast.success("Link copied");
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 grid place-items-center p-4" onClick={onClose}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4" onClick={(e) => e.stopPropagation()} data-testid="finance-job-modal">
+                <div className="flex items-center justify-between">
+                    <h2 className="font-bold text-lg flex items-center gap-2"><Bank size={20}/> Finance this job</h2>
+                    <button onClick={onClose}><X size={20}/></button>
+                </div>
+                {!result && (
+                    <>
+                        <p className="text-sm text-slate-500">Create a Fresh Cash application for <strong>{job.customer_name}</strong> and text them the link.</p>
+                        <div className="grid grid-cols-2 gap-3">
+                            <label className="text-xs block">Amount ($)
+                                <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
+                                    className="w-full h-10 px-3 rounded border border-slate-300 text-sm mt-1" data-testid="finance-job-amount"/>
+                            </label>
+                            <label className="text-xs block">Term (months)
+                                <select value={term} onChange={(e) => setTerm(e.target.value)} className="w-full h-10 px-3 rounded border border-slate-300 text-sm mt-1" data-testid="finance-job-term">
+                                    {[12, 24, 36, 48, 60, 72, 84].map((t) => <option key={t}>{t}</option>)}
+                                </select>
+                            </label>
+                        </div>
+                        <div className="bg-violet-50 border border-violet-200 rounded-lg px-3 py-2 text-xs text-violet-900">
+                            Soft credit check only — won't affect their score.
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => create(false)} disabled={creating || sending || !amount}
+                                className="flex-1 px-4 py-3 rounded-xl border border-slate-300 hover:bg-slate-50 font-bold text-sm disabled:opacity-50" data-testid="finance-job-create">
+                                {creating ? "…" : "Create link"}
+                            </button>
+                            <button onClick={() => create(true)} disabled={creating || sending || !amount || !job.customer_phone}
+                                className="flex-1 px-4 py-3 rounded-xl bg-violet-700 text-white font-bold text-sm disabled:opacity-50 inline-flex items-center justify-center gap-1" data-testid="finance-job-create-sms">
+                                <ChatText size={14}/> {sending ? "Sending…" : `Text ${job.customer_phone ? "now" : "(no #)"}`}
+                            </button>
+                        </div>
+                    </>
+                )}
+                {result && (
+                    <div className="space-y-3" data-testid="finance-job-result">
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                            <div className="text-sm font-bold text-green-900 flex items-center gap-1"><CheckCircle size={14} weight="fill"/> Application created</div>
+                            <div className="text-xs text-green-700 mt-1">${result.amount} · {result.term_months} months</div>
+                        </div>
+                        <div>
+                            <div className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Customer link</div>
+                            <div className="flex gap-1">
+                                <code className="flex-1 truncate bg-slate-50 px-2 py-2 rounded border text-xs">{publicUrl}</code>
+                                <button onClick={copy} className="px-2 rounded border border-slate-300 hover:bg-slate-50" data-testid="finance-job-copy"><Copy size={14}/></button>
+                            </div>
+                        </div>
+                        <a href={publicUrl} target="_blank" rel="noreferrer" className="block w-full text-center px-4 py-3 rounded-xl bg-violet-700 text-white font-bold text-sm">
+                            Open customer view →
+                        </a>
+                    </div>
+                )}
             </div>
         </div>
     );

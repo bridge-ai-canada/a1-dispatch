@@ -102,6 +102,55 @@ export default function JobDetail() {
         }
     };
 
+    const financeThisJob = async () => {
+        if (!job?.price || job.price < 500) {
+            Alert.alert("Amount too small", "Financing is available for jobs $500 and up.");
+            return;
+        }
+        Alert.alert(
+            "Finance this job?",
+            `Create a Fresh Cash application for ${job.customer_name} ($${Math.round(job.price)}) and text the link?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                { text: "Create link only", onPress: () => doFinance(false) },
+                { text: "Create + text", style: "default", onPress: () => doFinance(true) },
+            ],
+        );
+    };
+
+    const doFinance = async (sendSms: boolean) => {
+        setBusy(true);
+        try {
+            const { data } = await api.post("/financing/from-job", {
+                job_id: id,
+                amount: job.price,
+                term_months: 36,
+                send_sms: sendSms,
+                origin_url: API_URL.replace(/\/api$/, ""),
+            });
+            const url = `${API_URL.replace(/\/api$/, "")}/finance/${data.public_token}`;
+            if (sendSms) {
+                if (data.sms_result?.ok) {
+                    Alert.alert("Text sent ✅", `Sent to ${job.customer_phone}`);
+                } else if (data.sms_result?.error === "twilio_not_configured") {
+                    Alert.alert("Twilio not configured", `Share this link with the customer:\n\n${url}`);
+                } else if (data.sms_result?.error === "no_customer_phone") {
+                    Alert.alert("No phone on file", `Share this link manually:\n\n${url}`);
+                } else {
+                    Alert.alert("SMS failed", `Link: ${url}\n\nError: ${data.sms_result?.error || "unknown"}`);
+                }
+            } else {
+                Alert.alert("Application created ✅", `Customer link:\n\n${url}`, [
+                    { text: "Open", onPress: () => WebBrowser.openBrowserAsync(url) },
+                    { text: "Copy", onPress: async () => { try { const Clip = await import("expo-clipboard"); await Clip.setStringAsync(url); } catch (_) {} } },
+                    { text: "OK" },
+                ]);
+            }
+        } catch (e: any) {
+            Alert.alert("Failed", e.response?.data?.detail || "Could not create application");
+        } finally { setBusy(false); }
+    };
+
     const takePhoto = async () => {
         const perm = await ImagePicker.requestCameraPermissionsAsync();
         if (!perm.granted) { Alert.alert("Camera permission denied"); return; }
@@ -281,6 +330,13 @@ export default function JobDetail() {
                                 <Text style={s.bigBtnText}>🧭  Navigate</Text>
                             </TouchableOpacity>
                         </>
+                    )}
+                    {!job.paid && job.price >= 500 && (
+                        <TouchableOpacity onPress={financeThisJob} disabled={busy}
+                            style={[s.bigBtn, { backgroundColor: "#7C3AED", marginTop: 10, opacity: busy ? 0.5 : 1 }]}
+                            testID="finance-this-job-btn">
+                            <Text style={s.bigBtnText}>🏦  Finance this job (${Math.round(job.price)})</Text>
+                        </TouchableOpacity>
                     )}
                 </View>
 
