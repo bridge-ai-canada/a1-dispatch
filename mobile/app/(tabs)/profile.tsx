@@ -1,36 +1,36 @@
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 import { useAuth } from "../../lib/auth";
-import { colors } from "../../lib/theme";
+import { useTheme } from "../../lib/theme";
 
 export default function Profile() {
     const { user, signOut } = useAuth();
+    const { palette } = useTheme();
     return (
-        <View style={s.wrap}>
-            <View style={s.card}>
-                <Text style={s.kicker}>SIGNED IN</Text>
-                <Text style={s.name}>{user?.name}</Text>
-                <Text style={s.email}>{user?.email}</Text>
-                <View style={s.roleBadge}>
+        <ScrollView style={{ backgroundColor: palette.soft }} contentContainerStyle={{ padding: 16 }}>
+            <View style={[s.card, { backgroundColor: palette.paper, borderColor: palette.line }]}>
+                <Text style={[s.kicker, { color: palette.accent }]}>SIGNED IN</Text>
+                <Text style={[s.name, { color: palette.ink }]}>{user?.name}</Text>
+                <Text style={[s.email, { color: palette.muted }]}>{user?.email}</Text>
+                <View style={[s.roleBadge, { backgroundColor: palette.ink }]}>
                     <Text style={s.roleText}>{user?.role?.toUpperCase()}</Text>
                 </View>
             </View>
-            <TouchableOpacity onPress={signOut} style={s.btn}>
+            <TouchableOpacity onPress={signOut} style={[s.btn, { backgroundColor: palette.accent }]}>
                 <Text style={s.btnText}>Sign out</Text>
             </TouchableOpacity>
-            <Text style={s.footer}>A1 Field Pro · Mobile</Text>
-        </View>
+            <Text style={[s.footer, { color: palette.muted }]}>A1 Field Pro · Mobile</Text>
+        </ScrollView>
     );
 }
 
 const s = StyleSheet.create({
-    wrap: { flex: 1, backgroundColor: colors.soft, padding: 16 },
-    card: { backgroundColor: colors.paper, borderColor: colors.line, borderWidth: 1, padding: 24 },
-    kicker: { fontSize: 11, letterSpacing: 2, color: colors.accent, fontWeight: "800" },
-    name: { fontSize: 24, fontWeight: "800", color: colors.ink, marginTop: 6, letterSpacing: -0.4 },
-    email: { fontSize: 14, color: colors.muted, marginTop: 2 },
-    roleBadge: { alignSelf: "flex-start", backgroundColor: colors.ink, paddingHorizontal: 8, paddingVertical: 3, marginTop: 14 },
+    card: { padding: 24, borderWidth: 1, borderRadius: 12 },
+    kicker: { fontSize: 11, letterSpacing: 2, fontWeight: "800" },
+    name: { fontSize: 24, fontWeight: "800", marginTop: 6, letterSpacing: -0.4 },
+    email: { fontSize: 14, marginTop: 2 },
+    roleBadge: { alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 4, marginTop: 14, borderRadius: 4 },
     roleText: { fontSize: 10, color: "#fff", letterSpacing: 1.4, fontWeight: "700" },
-    btn: { marginTop: 16, backgroundColor: colors.accent, paddingVertical: 14, alignItems: "center" },
+    btn: { marginTop: 16, paddingVertical: 16, alignItems: "center", borderRadius: 12 },
     btnText: { color: "#fff", fontWeight: "800", letterSpacing: 0.5 },
-    footer: { textAlign: "center", color: colors.muted, fontSize: 11, marginTop: 32 },
+    footer: { textAlign: "center", fontSize: 11, marginTop: 32 },
 });

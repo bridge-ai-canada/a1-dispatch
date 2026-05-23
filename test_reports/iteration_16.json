@@ -1,0 +1,37 @@
+{
+  "summary": "Backend-only testing of new technician-mobile endpoints (timesheets, per-job time, checklist templates, materials catalog, voice notes, video upload, photo form fields, tenant isolation). All 38 pytest cases passed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_mobile_endpoints.py",
+    "/app/test_reports/pytest/iteration_16_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routers/timesheets.py: `list_my_shifts` uses `__import__('datetime').timedelta(...)` because `timedelta` isn't imported at module top — works but is ugly; please import `timedelta` directly.",
+    "routers/materials.py: stock decrement uses `int(body.qty or 0)` while qty is a float — fractional qty (e.g. 1.5) is silently truncated to 1 when decrementing stock. Consider rounding or rejecting fractional qty for stock-tracked items.",
+    "routers/materials.py: `update_material` / catalog endpoints don't currently log_activity (other CRUD does); minor inconsistency for audit trail.",
+    "routers/jobs.py videos: the 100MB size check happens AFTER `await file.read()` — a malicious 100MB+ payload is fully buffered into memory before rejection. Consider using `file.size` or streaming if available.",
+    "routers/checklists.py `update_template`: when items are provided in update body they come in as `ChecklistItemIn` (no `id` field on model), so existing item ids are always regenerated even though the code tries to preserve them via `i.get('id')`. Add `id: Optional[str]` to ChecklistItemIn to enable stable ids across edits.",
+    "routers/timesheets.py job_time_start: validates only this user's active log; two different users can run concurrent timers on the same job — that may be intended but worth confirming."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_mobile_endpoints.py"
+  ],
+  "success_rate": {
+    "backend": "100% (38/38)",
+    "frontend": "not tested (per request)"
+  },
+  "test_credentials": "demo@a1fieldpro.com / Demo1234! (from /app/memory/test_credentials.md). A throwaway tenant is also registered each run for isolation tests (cleans itself up).",
+  "seed_data_creation": "Per-run: 1 job (TEST_mobile_*), 1 checklist template (TEST_chk_*), 1 material (TEST_mat_*), 1 throwaway tenant for isolation. Templates/materials cleaned up via class-level fixture teardown; the test job and shift history rows are intentionally left behind for traceability (all prefixed TEST_).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Mobile-app backend coverage lives in /app/backend/tests/test_mobile_endpoints.py (38 tests, all green). Estimates/invoicing tests from iteration 15 already cover the rest. The tiny mp4-bytes upload happy-path works against the current storage backend; if storage rejects it later, the test auto-skips on non-200. Video size cap is enforced AFTER read — keep that in mind if testing huge uploads."
+}

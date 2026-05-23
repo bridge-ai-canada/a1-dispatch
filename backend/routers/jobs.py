@@ -4,7 +4,7 @@ import base64
 from io import BytesIO
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Response
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Response
 from pydantic import BaseModel
 
 from deps import (
@@ -234,7 +234,13 @@ async def dashboard_stats(user: dict = Depends(get_current_user)):
 
 
 @router.post("/jobs/{job_id}/photos")
-async def upload_job_photo(job_id: str, file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+async def upload_job_photo(
+    job_id: str,
+    file: UploadFile = File(...),
+    taken_at: Optional[str] = Form(None),
+    caption: Optional[str] = Form(None),
+    user: dict = Depends(get_current_user),
+):
     job = await db.jobs.find_one({"id": job_id, "company_id": user["company_id"]}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -253,12 +259,96 @@ async def upload_job_photo(job_id: str, file: UploadFile = File(...), user: dict
         "size": result.get("size", len(data)),
         "uploaded_by": user["id"],
         "uploaded_at": now_iso(),
+        "taken_at": taken_at or now_iso(),
+        "caption": (caption or "")[:200],
+        "kind": "photo",
     }
     await db.jobs.update_one(
         {"id": job_id, "company_id": user["company_id"]},
         {"$push": {"photos": photo}},
     )
     return photo
+
+
+@router.post("/jobs/{job_id}/videos")
+async def upload_job_video(
+    job_id: str,
+    file: UploadFile = File(...),
+    taken_at: Optional[str] = Form(None),
+    caption: Optional[str] = Form(None),
+    user: dict = Depends(get_current_user),
+):
+    job = await db.jobs.find_one({"id": job_id, "company_id": user["company_id"]}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if not file.content_type or not file.content_type.startswith("video/"):
+        raise HTTPException(status_code=400, detail="Only videos allowed")
+    ext = (file.filename or "vid").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else "mp4"
+    if ext not in {"mp4", "mov", "m4v", "webm"}:
+        ext = "mp4"
+    path = f"{APP_NAME}/{user['company_id']}/jobs/{job_id}/{uuid.uuid4()}.{ext}"
+    data = await file.read()
+    if len(data) > 100 * 1024 * 1024:  # 100MB cap
+        raise HTTPException(status_code=400, detail="Video too large (max 100MB)")
+    result = put_object(path, data, file.content_type)
+    video = {
+        "id": str(uuid.uuid4()),
+        "path": result["path"],
+        "content_type": file.content_type,
+        "size": result.get("size", len(data)),
+        "uploaded_by": user["id"],
+        "uploaded_at": now_iso(),
+        "taken_at": taken_at or now_iso(),
+        "caption": (caption or "")[:200],
+        "kind": "video",
+    }
+    await db.jobs.update_one(
+        {"id": job_id, "company_id": user["company_id"]},
+        {"$push": {"videos": video}},
+    )
+    return video
+
+
+@router.delete("/jobs/{job_id}/videos/{video_id}")
+async def delete_job_video(job_id: str, video_id: str, user: dict = Depends(get_current_user)):
+    job = await db.jobs.find_one(
+        {"id": job_id, "company_id": user["company_id"], "videos.id": video_id}, {"_id": 0}
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Video not found")
+    video = next((v for v in (job.get("videos") or []) if v.get("id") == video_id), None)
+    if video and video.get("path"):
+        delete_object(video["path"])
+    await db.jobs.update_one(
+        {"id": job_id, "company_id": user["company_id"]},
+        {"$pull": {"videos": {"id": video_id}}},
+    )
+    return {"ok": True}
+
+
+class VoiceNoteIn(BaseModel):
+    text: str
+
+
+@router.post("/jobs/{job_id}/voice-notes")
+async def add_voice_note(job_id: str, body: VoiceNoteIn, user: dict = Depends(get_current_user)):
+    job = await db.jobs.find_one({"id": job_id, "company_id": user["company_id"]}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if not body.text.strip():
+        raise HTTPException(status_code=400, detail="Voice note text required")
+    entry = {
+        "id": str(uuid.uuid4()),
+        "text": body.text.strip()[:2000],
+        "author_id": user["id"],
+        "author_name": user.get("name") or user.get("email"),
+        "created_at": now_iso(),
+    }
+    await db.jobs.update_one(
+        {"id": job_id, "company_id": user["company_id"]},
+        {"$push": {"voice_notes": entry}},
+    )
+    return entry
 
 
 @router.delete("/jobs/{job_id}/photos/{photo_id}")

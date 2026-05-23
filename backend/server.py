@@ -12,7 +12,7 @@ from deps import (
     init_storage,
     hash_password, verify_password,
 )
-from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates
+from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates, timesheets, checklists, materials
 
 app = FastAPI(title="A1 Field Pro API")
 api = APIRouter(prefix="/api")
@@ -34,6 +34,9 @@ api.include_router(dashboard.router)
 api.include_router(estimates.router)
 api.include_router(invoices.router)
 api.include_router(proposal_templates.router)
+api.include_router(timesheets.router)
+api.include_router(checklists.router)
+api.include_router(materials.router)
 
 
 @api.get("/")
@@ -69,6 +72,10 @@ async def startup():
     await db.invoices.create_index([("company_id", 1), ("number", 1)])
     await db.proposal_templates.create_index([("company_id", 1), ("kind", 1)])
     await db.counters.create_index([("company_id", 1), ("kind", 1)], unique=True)
+    await db.shifts.create_index([("user_id", 1), ("started_at", -1)])
+    await db.shifts.create_index([("company_id", 1), ("started_at", -1)])
+    await db.materials.create_index([("company_id", 1), ("name", 1)])
+    await db.checklist_templates.create_index([("company_id", 1)])
     await seed_demo()
 
 
