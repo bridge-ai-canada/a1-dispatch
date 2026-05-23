@@ -213,7 +213,8 @@ async def ai_dispatcher_ask(body: DispatchAskIn, user: dict = Depends(get_curren
         raise HTTPException(status_code=400, detail="Question required")
     jobs = await db.jobs.find(
         {"company_id": user["company_id"],
-         "status": {"$in": ["unscheduled", "won_bid", "scheduled_installation", "in_progress"]}},
+         "status": {"$in": ["new_lead", "contacted", "qualified", "quote_sent",
+                            "unscheduled", "won_bid", "scheduled_installation", "in_progress"]}},
         {"_id": 0},
     ).sort("scheduled_at", 1).to_list(30)
     team = await db.users.find(

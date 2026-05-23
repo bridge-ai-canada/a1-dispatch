@@ -4,15 +4,19 @@ import { toast } from "sonner";
 import { Plus, X, CreditCard } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 
-const STATUS = ["unscheduled", "won_bid", "on_hold", "scheduled_installation", "in_progress", "completed", "lost_bid", "cancelled"];
+const STATUS = ["new_lead", "contacted", "qualified", "quote_sent", "won_bid", "lost_bid", "scheduled_installation", "unscheduled", "on_hold", "in_progress", "completed", "cancelled"];
 const STATUS_LABEL = {
-    unscheduled: "Unscheduled",
+    new_lead: "New lead",
+    contacted: "Contacted",
+    qualified: "Qualified",
+    quote_sent: "Quote sent",
     won_bid: "Won bid",
-    on_hold: "On hold",
+    lost_bid: "Lost bid",
     scheduled_installation: "Scheduled installation",
+    unscheduled: "Unscheduled",
+    on_hold: "On hold",
     in_progress: "In progress",
     completed: "Completed",
-    lost_bid: "Lost bid",
     cancelled: "Cancelled",
 };
 
@@ -25,12 +29,16 @@ function toLocalDt(iso) {
 }
 
 const STATUS_COLORS = {
+    new_lead: "bg-sky-50 text-sky-700 border-sky-300",
+    contacted: "bg-cyan-50 text-cyan-700 border-cyan-300",
+    qualified: "bg-teal-50 text-teal-700 border-teal-300",
+    quote_sent: "bg-violet-50 text-violet-700 border-violet-300",
     unscheduled: "bg-slate-100 text-slate-700 border-slate-300",
     won_bid: "bg-violet-50 text-violet-700 border-violet-400",
     lost_bid: "bg-rose-50 text-rose-700 border-rose-300",
     on_hold: "bg-orange-50 text-orange-700 border-orange-400",
     scheduled_installation: "bg-blue-50 text-[#1D4ED8] border-[#1D4ED8]/30",
-    scheduled: "bg-blue-50 text-[#1D4ED8] border-[#1D4ED8]/30", // legacy
+    scheduled: "bg-blue-50 text-[#1D4ED8] border-[#1D4ED8]/30",
     in_progress: "bg-amber-50 text-amber-700 border-amber-400",
     completed: "bg-emerald-50 text-emerald-700 border-emerald-400",
     cancelled: "bg-red-50 text-[#DC2626] border-[#DC2626]/40",

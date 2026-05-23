@@ -5,16 +5,20 @@ import { toast } from "sonner";
 import { Funnel, Sparkle, EyeSlash, Eye } from "@phosphor-icons/react";
 
 const COLUMNS = [
-    { key: "unscheduled",            label: "Unscheduled",        accent: "#64748B" },
-    { key: "won_bid",                label: "Won bid",            accent: "#7C3AED" },
+    { key: "new_lead",               label: "New leads",          accent: "#0EA5E9" },
+    { key: "contacted",              label: "Contacted",          accent: "#0891B2" },
+    { key: "qualified",              label: "Qualified",          accent: "#06B6D4" },
+    { key: "quote_sent",             label: "Quote sent",         accent: "#8B5CF6" },
+    { key: "won_bid",                label: "Won bids",           accent: "#7C3AED" },
+    { key: "lost_bid",               label: "Lost bids",          accent: "#BE123C" },
     { key: "scheduled_installation", label: "Scheduled install",  accent: "#1D4ED8" },
-    { key: "in_progress",            label: "In progress",        accent: "#D97706" },
+    { key: "unscheduled",            label: "Unscheduled",        accent: "#64748B" },
     { key: "on_hold",                label: "On hold",            accent: "#EA580C" },
-    { key: "completed",              label: "Completed",          accent: "#16A34A" },
+    { key: "cancelled",              label: "Cancelled",          accent: "#DC2626" },
 ];
 const OPTIONAL_COLUMNS = [
-    { key: "lost_bid",  label: "Lost bid",  accent: "#BE123C" },
-    { key: "cancelled", label: "Cancelled", accent: "#DC2626" },
+    { key: "in_progress", label: "In progress", accent: "#D97706" },
+    { key: "completed",   label: "Completed",   accent: "#16A34A" },
 ];
 
 function fmtMoney(v) { return `$${(Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`; }
@@ -112,7 +116,7 @@ export default function Pipeline() {
                         className="inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg border border-slate-200 hover:border-slate-400 bg-white"
                         data-testid="pipeline-toggle-archive">
                         {showArchive ? <EyeSlash size={14}/> : <Eye size={14}/>}
-                        {showArchive ? "Hide lost/cancelled" : "Show lost/cancelled"}
+                        {showArchive ? "Hide active jobs" : "Show in-progress & completed"}
                     </button>
                 </div>
             </div>

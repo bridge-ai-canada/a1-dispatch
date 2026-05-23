@@ -402,7 +402,7 @@ class JobIn(BaseModel):
     scheduled_at: Optional[str] = None
     duration_min: int = 60
     price: float = 0.0
-    status: Literal["unscheduled", "won_bid", "lost_bid", "on_hold", "scheduled_installation", "in_progress", "completed", "cancelled"] = "unscheduled"
+    status: Literal["new_lead", "contacted", "qualified", "quote_sent", "won_bid", "lost_bid", "scheduled_installation", "unscheduled", "on_hold", "in_progress", "completed", "cancelled"] = "unscheduled"
     priority: Literal["low", "normal", "high", "emergency"] = "normal"
 
 class JobUpdate(BaseModel):
@@ -412,7 +412,7 @@ class JobUpdate(BaseModel):
     scheduled_at: Optional[str] = None
     duration_min: Optional[int] = None
     price: Optional[float] = None
-    status: Optional[Literal["unscheduled", "won_bid", "lost_bid", "on_hold", "scheduled_installation", "in_progress", "completed", "cancelled"]] = None
+    status: Optional[Literal["new_lead", "contacted", "qualified", "quote_sent", "won_bid", "lost_bid", "scheduled_installation", "unscheduled", "on_hold", "in_progress", "completed", "cancelled"]] = None
     address: Optional[str] = None
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None

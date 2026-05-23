@@ -87,6 +87,10 @@ function JobCard({ job, palette, isDark, onPress }: any) {
         : "";
     const isEmergency = job.priority === "emergency" || job.priority === "high";
     const statusColor: any = {
+        new_lead: { bg: isDark ? "#0C4A6E" : "#F0F9FF", fg: isDark ? "#7DD3FC" : "#0369A1" },
+        contacted: { bg: isDark ? "#164E63" : "#ECFEFF", fg: isDark ? "#67E8F9" : "#0E7490" },
+        qualified: { bg: isDark ? "#134E4A" : "#F0FDFA", fg: isDark ? "#5EEAD4" : "#0F766E" },
+        quote_sent: { bg: isDark ? "#4C1D95" : "#F5F3FF", fg: isDark ? "#C4B5FD" : "#6D28D9" },
         scheduled_installation: { bg: isDark ? "#1E3A8A" : "#EFF6FF", fg: palette.primary },
         scheduled: { bg: isDark ? "#1E3A8A" : "#EFF6FF", fg: palette.primary },
         won_bid: { bg: isDark ? "#4C1D95" : "#F5F3FF", fg: isDark ? "#C4B5FD" : "#6D28D9" },
@@ -98,6 +102,10 @@ function JobCard({ job, palette, isDark, onPress }: any) {
         cancelled: { bg: isDark ? "#7F1D1D" : "#FEE2E2", fg: palette.accent },
     }[job.status] || { bg: palette.surface2, fg: palette.muted };
     const STATUS_LABEL: any = {
+        new_lead: "NEW LEAD",
+        contacted: "CONTACTED",
+        qualified: "QUALIFIED",
+        quote_sent: "QUOTE SENT",
         scheduled_installation: "SCHEDULED",
         won_bid: "WON BID",
         lost_bid: "LOST BID",

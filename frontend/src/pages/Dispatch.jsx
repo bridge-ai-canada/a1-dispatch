@@ -38,6 +38,10 @@ const PRIORITY_RING = {
 };
 
 const STATUS_BG = {
+    new_lead:    "bg-sky-50 text-sky-700",
+    contacted:   "bg-cyan-50 text-cyan-700",
+    qualified:   "bg-teal-50 text-teal-700",
+    quote_sent:  "bg-violet-50 text-violet-700",
     unscheduled: "bg-slate-100 text-slate-700",
     won_bid:     "bg-violet-50 text-violet-700",
     lost_bid:    "bg-rose-50 text-rose-700",
@@ -47,6 +51,21 @@ const STATUS_BG = {
     in_progress: "bg-amber-50 text-amber-700",
     completed:   "bg-emerald-50 text-emerald-700",
     cancelled:   "bg-red-50 text-[#DC2626]",
+};
+const STATUS_LABEL = {
+    new_lead: "NEW LEAD",
+    contacted: "CONTACTED",
+    qualified: "QUALIFIED",
+    quote_sent: "QUOTE SENT",
+    unscheduled: "UNSCHEDULED",
+    won_bid: "WON BID",
+    lost_bid: "LOST BID",
+    on_hold: "ON HOLD",
+    scheduled_installation: "SCHEDULED",
+    scheduled: "SCHEDULED",
+    in_progress: "IN PROGRESS",
+    completed: "COMPLETED",
+    cancelled: "CANCELLED",
 };
 
 const TYPE_COLOR = {

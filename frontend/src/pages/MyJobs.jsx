@@ -12,6 +12,10 @@ const STATUS_NEXT = {
     in_progress: { label: "Mark Complete", next: "completed", color: "bg-emerald-600", icon: CheckCircle },
 };
 const STATUS_LABEL = {
+    new_lead: "New lead",
+    contacted: "Contacted",
+    qualified: "Qualified",
+    quote_sent: "Quote sent",
     unscheduled: "Unscheduled",
     won_bid: "Won bid",
     lost_bid: "Lost bid",

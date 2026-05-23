@@ -143,13 +143,18 @@ async def update_job(job_id: str, body: JobUpdate, user: dict = Depends(get_curr
         from bg_tasks import schedule_geocode
         schedule_geocode(job_id, user["company_id"], updates["address"])
     new_status = updates.get("status")
-    PIPELINE_STATUSES = ("won_bid", "lost_bid", "on_hold",
+    PIPELINE_STATUSES = ("new_lead", "contacted", "qualified", "quote_sent",
+                         "won_bid", "lost_bid", "on_hold",
                          "scheduled_installation", "in_progress", "completed", "cancelled")
     if new_status in PIPELINE_STATUSES:
         await log_activity(user, f"jobs.{new_status}", "job", job_id,
                            {"title": job.get("title")})
     if new_status in PIPELINE_STATUSES and job.get("customer_id"):
         verb = {
+            "new_lead": "marked as new lead",
+            "contacted": "contacted",
+            "qualified": "qualified",
+            "quote_sent": "quote sent",
             "won_bid": "bid won for",
             "lost_bid": "bid lost on",
             "on_hold": "placed on hold",

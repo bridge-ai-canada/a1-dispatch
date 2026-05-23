@@ -5,6 +5,10 @@ import { ChartLineUp, CurrencyDollar, Wrench, UsersThree, ArrowUpRight, Clock, S
 import { Link } from "react-router-dom";
 
 const STATUS_COLORS = {
+    new_lead: "bg-sky-50 text-sky-700 border-sky-300",
+    contacted: "bg-cyan-50 text-cyan-700 border-cyan-300",
+    qualified: "bg-teal-50 text-teal-700 border-teal-300",
+    quote_sent: "bg-violet-50 text-violet-700 border-violet-300",
     unscheduled: "bg-slate-100 text-slate-700 border-slate-300",
     won_bid: "bg-violet-50 text-violet-700 border-violet-400",
     lost_bid: "bg-rose-50 text-rose-700 border-rose-300",
