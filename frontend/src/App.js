@@ -36,6 +36,7 @@ import Invoices from "./pages/Invoices";
 import InvoiceBuilder from "./pages/InvoiceBuilder";
 import InvoiceDetail from "./pages/InvoiceDetail";
 import Templates from "./pages/Templates";
+import AICenter from "./pages/AICenter";
 import PublicEstimate from "./pages/PublicEstimate";
 import PublicInvoice from "./pages/PublicInvoice";
 
@@ -107,6 +108,7 @@ function App() {
                         <Route path="invoices/:id" element={<InvoiceDetail />} />
                         <Route path="invoices/:id/edit" element={<InvoiceBuilder />} />
                         <Route path="templates" element={<Templates />} />
+                        <Route path="ai" element={<AICenter />} />
                         <Route path="notifications" element={<NotificationPrefs />} />
                     </Route>
 

@@ -9,6 +9,7 @@ import {
 } from "@phosphor-icons/react";
 import { Calendar } from "../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
+import CustomerChatbot from "../components/CustomerChatbot";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -164,6 +165,7 @@ export default function BookingWidget() {
                     Powered by <Link to="/" className="font-semibold text-slate-600">A1 Field Pro</Link>
                 </div>
             </div>
+            <CustomerChatbot companyId={company.id} companyName={company.name} primary={accent}/>
         </div>
     );
 }

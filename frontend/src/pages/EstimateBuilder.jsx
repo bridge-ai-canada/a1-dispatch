@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import api, { formatApiError } from "../lib/api";
 import { toast } from "sonner";
 import { Plus, Trash, Star, FloppyDisk, ArrowLeft, Sparkle, CreditCard } from "@phosphor-icons/react";
+import { AIGenerateEstimateButton } from "../components/AIAssist";
 
 const TIER_KEYS = ["good", "better", "best"];
 const TIER_COLORS = {
@@ -212,6 +213,16 @@ export default function EstimateBuilder() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    <AIGenerateEstimateButton onGenerated={(g) => {
+                        setForm((f) => ({
+                            ...f,
+                            title: g.title || f.title,
+                            intro: g.intro || f.intro,
+                            tiers: TIER_KEYS.map((k) =>
+                                (g.tiers || []).find((t) => t.key === k) || emptyTier(k)
+                            ),
+                        }));
+                    }} />
                     {templates.length > 0 && (
                         <select
                             className="text-sm border border-slate-200 rounded-lg px-3 py-2"

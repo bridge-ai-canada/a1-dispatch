@@ -9,6 +9,7 @@ import {
 import { MapContainer, TileLayer, Marker, Popup, CircleMarker } from "react-leaflet";
 import L from "leaflet";
 import "./Dispatch.css";
+import AIDispatcherPanel from "../components/AIDispatcherPanel";
 
 // Fix Leaflet default icon URLs (won't load through webpack otherwise)
 delete L.Icon.Default.prototype._getIconUrl;
@@ -211,6 +212,7 @@ export default function Dispatch() {
                     emergencyCount={emergencyCount}
                 />
             </div>
+            <AIDispatcherPanel />
         </div>
     );
 }

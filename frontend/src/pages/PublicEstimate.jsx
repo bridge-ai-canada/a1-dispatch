@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import axios from "axios";
 import { toast, Toaster } from "sonner";
 import SignaturePad from "../components/SignaturePad";
+import CustomerChatbot from "../components/CustomerChatbot";
 import {
     CheckCircle, Star, ShieldCheck, FilePdf, CreditCard,
     SealCheck, X, ChatCircleText, Confetti,
@@ -405,6 +406,8 @@ export default function PublicEstimate() {
             <footer className="text-center py-8 text-xs text-slate-400">
                 Powered by A1 Field Pro · Secure proposal
             </footer>
+            <CustomerChatbot companyId={company?.id || estimate?.company_id}
+                companyName={company?.name} primary={primary}/>
         </div>
     );
 }

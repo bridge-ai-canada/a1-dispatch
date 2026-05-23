@@ -5,7 +5,7 @@ import {
     SquaresFour, Wrench, CalendarBlank, UsersThree,
     AddressBook, GearSix, SignOut, List, X, DeviceMobile,
     ShieldCheck, ClockCounterClockwise, Buildings, EnvelopeSimple,
-    ArrowsClockwise, ChartLine, Broadcast, FileText, Receipt, Stack,
+    ArrowsClockwise, ChartLine, Broadcast, FileText, Receipt, Stack, Sparkle,
 } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import api from "../lib/api";
@@ -22,6 +22,7 @@ const baseNav = [
     { to: "/app/estimates", label: "Estimates", icon: FileText, roles: ["owner","dispatcher","office_manager","csr","sales_rep","accountant"] },
     { to: "/app/invoices", label: "Invoices", icon: Receipt, roles: ["owner","dispatcher","office_manager","accountant"] },
     { to: "/app/templates", label: "Templates", icon: Stack, roles: ["owner","office_manager"] },
+    { to: "/app/ai", label: "AI Assistant", icon: Sparkle, roles: ["owner","dispatcher","office_manager"] },
     { to: "/app/my-jobs", label: "My Jobs", icon: DeviceMobile, roles: ["owner","dispatcher","technician"] },
     { to: "/app/recurring", label: "Recurring", icon: ArrowsClockwise, roles: ["owner","dispatcher","office_manager"] },
     { to: "/app/reports", label: "Reports", icon: ChartLine, roles: ["owner","accountant","super_admin"] },

@@ -7,6 +7,7 @@ import {
     ArrowLeft, Camera, Trash, CreditCard, FloppyDisk, PencilSimple, Eraser,
     MapPin, Phone, Clock, CheckCircle, PlayCircle, UploadSimple,
 } from "@phosphor-icons/react";
+import { AIPolishButton, AIActionButton } from "../components/AIAssist";
 
 const STATUS_NEXT = {
     unscheduled: { label: "Schedule", next: "scheduled_installation" },
@@ -147,16 +148,27 @@ export default function JobDetail() {
                     <section className="border border-slate-200">
                         <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
                             <div className="overline">Notes</div>
-                            <button onClick={saveNotes} disabled={savingNotes} data-testid="save-notes-button"
-                                className="text-xs flex items-center gap-1 px-3 py-1.5 bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-60">
-                                <FloppyDisk size={12} /> {savingNotes ? "Saving..." : "Save"}
-                            </button>
+                            <div className="flex items-center gap-3">
+                                <AIPolishButton notes={notes} onPolished={(p) => setNotes(p)} />
+                                {job.status === "completed" && (
+                                    <AIActionButton label="Job summary"
+                                        endpoint="/ai/jobs/summarize"
+                                        body={{ job_id: id }}
+                                        onResult={(d) => { setNotes(d.summary || notes); toast.success("Summary inserted"); }} />
+                                )}
+                                <button onClick={saveNotes} disabled={savingNotes} data-testid="save-notes-button"
+                                    className="text-xs flex items-center gap-1 px-3 py-1.5 bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-60">
+                                    <FloppyDisk size={12} /> {savingNotes ? "Saving..." : "Save"}
+                                </button>
+                            </div>
                         </div>
                         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={6}
                             data-testid="notes-textarea"
                             placeholder="Add diagnostic notes, parts used, customer remarks..."
                             className="w-full p-4 outline-none resize-y border-0 focus:ring-2 focus:ring-inset focus:ring-[#1D4ED8]" />
                     </section>
+
+                    <UpsellSuggestion jobId={id} />
 
                     <section className="border border-slate-200">
                         <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
@@ -200,6 +212,55 @@ function Info({ label, value, icon: Icon, className = "" }) {
                 {value || "—"}
             </div>
         </div>
+    );
+}
+
+function UpsellSuggestion({ jobId }) {
+    const [busy, setBusy] = useState(false);
+    const [result, setResult] = useState(null);
+    const run = async () => {
+        setBusy(true);
+        try {
+            const { data } = await api.post("/ai/jobs/upsell", { job_id: jobId }, { timeout: 60_000 });
+            setResult(data);
+        } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+        finally { setBusy(false); }
+    };
+    return (
+        <section className="border-2 border-dashed border-[#F97316]/50 bg-orange-50/30 p-4 rounded-lg">
+            {!result ? (
+                <div className="flex items-center justify-between gap-3">
+                    <div>
+                        <div className="text-xs font-bold uppercase tracking-widest text-[#F97316]">✨ AI upsell suggestion</div>
+                        <p className="mt-1 text-sm text-slate-600">Generate a personalized upsell recommendation for this customer.</p>
+                    </div>
+                    <button onClick={run} disabled={busy}
+                        className="bg-[#F97316] hover:bg-[#EA580C] text-white font-bold text-sm px-4 py-2 rounded-lg disabled:opacity-50"
+                        data-testid="ai-upsell-button">
+                        {busy ? "Thinking…" : "Get suggestion"}
+                    </button>
+                </div>
+            ) : (
+                <div>
+                    <div className="text-xs font-bold uppercase tracking-widest text-[#F97316]">✨ Recommended upsell</div>
+                    <div className="mt-1 flex items-baseline justify-between gap-3">
+                        <div className="text-lg font-extrabold text-slate-900">{result.title}</div>
+                        {result.suggested_price > 0 && (
+                            <div className="text-lg font-extrabold text-emerald-600">${Number(result.suggested_price).toFixed(2)}</div>
+                        )}
+                    </div>
+                    <p className="mt-1 text-sm text-slate-700">{result.reason}</p>
+                    {result.confidence != null && (
+                        <div className="mt-2 text-xs text-slate-500">
+                            Confidence: <b>{(result.confidence * 100).toFixed(0)}%</b>
+                        </div>
+                    )}
+                    <button onClick={() => setResult(null)} className="mt-2 text-xs text-slate-500 hover:text-slate-900">
+                        Try another
+                    </button>
+                </div>
+            )}
+        </section>
     );
 }
 
