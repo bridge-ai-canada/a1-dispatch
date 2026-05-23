@@ -12,7 +12,7 @@ from deps import (
     init_storage,
     hash_password, verify_password,
 )
-from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates, timesheets, checklists, materials, ai
+from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates, timesheets, checklists, materials, ai, sms
 
 app = FastAPI(title="A1 Field Pro API")
 api = APIRouter(prefix="/api")
@@ -38,6 +38,7 @@ api.include_router(timesheets.router)
 api.include_router(checklists.router)
 api.include_router(materials.router)
 api.include_router(ai.router)
+api.include_router(sms.router)
 
 
 @api.get("/")
@@ -80,6 +81,7 @@ async def startup():
     await db.ai_logs.create_index([("company_id", 1), ("created_at", -1)])
     await db.maintenance_suggestions.create_index([("company_id", 1), ("status", 1)])
     await db.chatbot_messages.create_index([("session_id", 1), ("created_at", 1)])
+    await db.sms_log.create_index([("company_id", 1), ("created_at", -1)])
     # one-time migration: legacy "scheduled" status -> "scheduled_installation"
     await db.jobs.update_many(
         {"status": "scheduled"},

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { formatApiError } from "../lib/api";
 import { toast } from "sonner";
-import { Funnel, Sparkle, EyeSlash, Eye } from "@phosphor-icons/react";
+import { Funnel } from "@phosphor-icons/react";
 
 const COLUMNS = [
     { key: "new_lead",               label: "New leads",          accent: "#0EA5E9" },
@@ -10,15 +10,13 @@ const COLUMNS = [
     { key: "qualified",              label: "Qualified",          accent: "#06B6D4" },
     { key: "quote_sent",             label: "Quote sent",         accent: "#8B5CF6" },
     { key: "won_bid",                label: "Won bids",           accent: "#7C3AED" },
-    { key: "lost_bid",               label: "Lost bids",          accent: "#BE123C" },
     { key: "scheduled_installation", label: "Scheduled install",  accent: "#1D4ED8" },
+    { key: "in_progress",            label: "In progress",        accent: "#D97706" },
+    { key: "completed",              label: "Completed",          accent: "#16A34A" },
     { key: "unscheduled",            label: "Unscheduled",        accent: "#64748B" },
     { key: "on_hold",                label: "On hold",            accent: "#EA580C" },
+    { key: "lost_bid",               label: "Lost bids",          accent: "#BE123C" },
     { key: "cancelled",              label: "Cancelled",          accent: "#DC2626" },
-];
-const OPTIONAL_COLUMNS = [
-    { key: "in_progress", label: "In progress", accent: "#D97706" },
-    { key: "completed",   label: "Completed",   accent: "#16A34A" },
 ];
 
 function fmtMoney(v) { return `$${(Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`; }
@@ -34,7 +32,6 @@ export default function Pipeline() {
     const [loading, setLoading] = useState(true);
     const [dragId, setDragId] = useState(null);
     const [dragOver, setDragOver] = useState(null);
-    const [showArchive, setShowArchive] = useState(false);
     const [search, setSearch] = useState("");
 
     const load = useCallback(async () => {
@@ -47,7 +44,7 @@ export default function Pipeline() {
     }, []);
     useEffect(() => { load(); }, [load]);
 
-    const cols = showArchive ? [...COLUMNS, ...OPTIONAL_COLUMNS] : COLUMNS;
+    const cols = COLUMNS;
 
     const byCol = useMemo(() => {
         const s = (search || "").toLowerCase().trim();
@@ -87,7 +84,7 @@ export default function Pipeline() {
         setJobs((arr) => arr.map((j) => j.id === jobId ? { ...j, status: nextStatus } : j));
         try {
             await api.patch(`/jobs/${jobId}`, { status: nextStatus });
-            toast.success(`Moved "${job.title}" → ${COLUMNS.concat(OPTIONAL_COLUMNS).find((c) => c.key === nextStatus)?.label || nextStatus}`);
+            toast.success(`Moved "${job.title}" → ${COLUMNS.find((c) => c.key === nextStatus)?.label || nextStatus}`);
         } catch (e) {
             setJobs((arr) => arr.map((j) => j.id === jobId ? { ...j, status: prev } : j));
             toast.error(formatApiError(e.response?.data?.detail) || "Move failed");
@@ -112,12 +109,6 @@ export default function Pipeline() {
                         />
                         <Funnel size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     </div>
-                    <button onClick={() => setShowArchive((v) => !v)}
-                        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg border border-slate-200 hover:border-slate-400 bg-white"
-                        data-testid="pipeline-toggle-archive">
-                        {showArchive ? <EyeSlash size={14}/> : <Eye size={14}/>}
-                        {showArchive ? "Hide active jobs" : "Show in-progress & completed"}
-                    </button>
                 </div>
             </div>
 
