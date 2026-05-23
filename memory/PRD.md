@@ -416,7 +416,37 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - ✅ Wired into `App.js` route `/app/analytics` + sidebar nav (owner / office_manager / accountant / super_admin).
 - ✅ Backend 20/20 pytest + frontend 100% (iteration 25). `retest_needed=False`.
 
+### Feb 2026 — Iteration 26 — Integration Hub + Webhooks + Sync Engine
+- ✅ **9 third-party integrations** wired with per-tenant credentials (Fernet-encrypted in Mongo):
+  - **Accounting**: QuickBooks Online (OAuth2, customer/invoice/payment sync via CDC)
+  - **Payments**: Helcim (API token, tokenized card charges), Stripe (existing, surfaced in hub)
+  - **Messaging**: Twilio (existing, surfaced in hub)
+  - **Calendar**: Google Calendar + Outlook Calendar (OAuth2, event sync via watch / Graph subscriptions)
+  - **Email**: Gmail (OAuth2, gmail.send)
+  - **Video**: Zoom (Server-to-Server OAuth, auto-create meeting links)
+  - **Maps**: Google Maps (Distance Matrix + Places autocomplete keys)
+- ✅ **Backend** (`/app/backend/integrations/`):
+  - `registry.py` — single catalog driving UI cards, OAuth scopes, sync intervals.
+  - `store.py` — per-tenant Fernet encryption + OAuth state CSRF table with TTL index.
+  - `oauth.py` — auth-URL builder, code exchange, refresh, Zoom S2S helper.
+  - `routers/integrations.py` — GET list/catalog, POST save (api-token), DELETE disconnect, POST test (live ping), POST sync, GET /start /callback for OAuth2.
+  - Owner / office_manager / super_admin only; technicians → 403.
+- ✅ **Webhook system** (`/app/backend/routers/webhooks.py`):
+  - **Inbound** at `/api/webhooks/in/{provider}` for Stripe, Twilio, QuickBooks, Helcim, Zoom, Google Calendar, Outlook (handles MS Graph `validationToken` + Google sync ping). Per-provider signature verification.
+  - **Outbound** subscriptions CRUD + delivery log: HMAC-SHA256 signed POSTs with `X-A1FP-Signature: t={ts},v1={hex}`, retry backoff 10s/1m/5m/30m, secret shown ONCE.
+  - 14 event types: job.*, invoice.*, estimate.*, customer.*, finance_application.*, payment.received.
+- ✅ **Sync engine** — APScheduler `AsyncIOScheduler` with 3 boot-time jobs (QuickBooks 30m, Google Calendar 15m, Outlook 15m). Heartbeats logged to `integration_sync_events` until OAuth tokens supplied.
+- ✅ **Frontend**:
+  - `/app/integrations` — Hub with 9 cards, category filters, skeleton loaders, status badges. Modal: OAuth Connect OR field form, Test / Sync / Disconnect actions.
+  - `/app/integrations/webhooks` — Subs table + deliveries log, "New subscription" modal with event multi-select + secret-once banner.
+  - Sidebar nav: Integrations + Webhooks links.
+- ✅ Outbound emission wired into `routers/jobs.py` (`job.created`). Pattern documented for invoices/estimates/financing.
+- ✅ Backend 23/23 pytest + frontend 100% (iteration 26). `retest_needed=False`.
+- ⚠️ Live OAuth requires user-supplied env vars; UI shows "Platform OAuth client not configured" until set. API-token providers (Helcim/Twilio/Maps/Zoom) work immediately on save.
+- ⚠️ Fernet key derives from `JWT_SECRET` — set `INTEGRATION_FERNET_KEY` for prod.
+
 ### P1 — Remaining
+- User-supplied OAuth credentials for QuickBooks / Google / Microsoft / Zoom (UI ready, env vars needed)
 - Stripe Price IDs (`STRIPE_PRICE_STARTER`, `STRIPE_PRICE_LITE`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_ENTERPRISE`) for real billing — currently dev-mode flips plan locally.
 - Twilio SMS — backend wired & gated, awaiting credentials.
 - Mapbox/Google fallback for Nominatim 429 — wired, awaiting `MAPBOX_ACCESS_TOKEN` or `GOOGLE_MAPS_API_KEY`.

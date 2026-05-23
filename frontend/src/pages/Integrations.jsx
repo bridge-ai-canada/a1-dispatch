@@ -19,6 +19,7 @@ const CATEGORIES = {
 
 export default function Integrations() {
     const [list, setList] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [selected, setSelected] = useState(null);
     const [filter, setFilter] = useState("all");
     const [params] = useSearchParams();
@@ -29,7 +30,7 @@ export default function Integrations() {
             setList(data.integrations);
         } catch (e) {
             toast.error(formatApiError(e.response?.data?.detail));
-        }
+        } finally { setLoading(false); }
     };
     useEffect(() => { load(); }, []);
 
@@ -75,7 +76,20 @@ export default function Integrations() {
             </div>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filtered.map((i) => (
+                {loading && Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="bg-white border border-slate-200 rounded-2xl p-5 animate-pulse">
+                        <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 rounded-xl bg-slate-200"/>
+                            <div className="flex-1 space-y-2">
+                                <div className="h-3 w-24 bg-slate-200 rounded"/>
+                                <div className="h-2 w-16 bg-slate-100 rounded"/>
+                            </div>
+                        </div>
+                        <div className="mt-4 h-3 w-full bg-slate-100 rounded"/>
+                        <div className="mt-2 h-3 w-2/3 bg-slate-100 rounded"/>
+                    </div>
+                ))}
+                {!loading && filtered.map((i) => (
                     <IntegrationCard key={i.key} integ={i} onClick={() => setSelected(i)}/>
                 ))}
             </div>
