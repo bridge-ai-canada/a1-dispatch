@@ -22,6 +22,14 @@ export default function CommandPalette({ navItems = [] }) {
     useEffect(() => {
         const handler = (e) => {
             if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+                // Don't hijack Cmd/Ctrl+K when typing in an input/textarea/contentEditable
+                // unless the palette is already open.
+                const el = document.activeElement;
+                const isEditable = el && (
+                    el.tagName === "INPUT" || el.tagName === "TEXTAREA" ||
+                    el.isContentEditable
+                );
+                if (isEditable && !open) return;
                 e.preventDefault();
                 setOpen((o) => !o);
             }
@@ -29,7 +37,7 @@ export default function CommandPalette({ navItems = [] }) {
         };
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
-    }, []);
+    }, [open]);
 
     useEffect(() => {
         if (open) {

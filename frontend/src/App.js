@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { Toaster } from "sonner";
 import Layout, { Protected } from "./components/Layout";
+import RouteErrorBoundary from "./components/RouteErrorBoundary";
 
 // --- Eager: auth + public pages (small, needed on first paint) ---
 import Landing from "./pages/Landing";
@@ -91,6 +92,7 @@ function App() {
             <BrowserRouter>
                 <Toaster position="top-right" richColors closeButton />
                 <HashGuard>
+                <RouteErrorBoundary>
                 <Suspense fallback={<RouteFallback />}>
                 <Routes>
                     <Route path="/" element={<HomeRouter />} />
@@ -159,6 +161,7 @@ function App() {
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
                 </Suspense>
+                </RouteErrorBoundary>
                 </HashGuard>
             </BrowserRouter>
         </AuthProvider>

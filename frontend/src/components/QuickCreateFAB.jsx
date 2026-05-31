@@ -13,10 +13,10 @@ import { useAuth } from "../context/AuthContext";
  */
 const ACTIONS = [
     { key: "job",        label: "Work order", icon: Wrench,      path: "/app/jobs?new=1",       roles: ["owner","dispatcher","office_manager","csr","sales_rep"] },
-    { key: "customer",   label: "Customer",   icon: AddressBook, path: "/app/customers?new=1",  roles: ["owner","dispatcher","office_manager","csr","sales_rep"] },
-    { key: "estimate",   label: "Estimate",   icon: FileText,    path: "/app/estimates/new",    roles: ["owner","dispatcher","office_manager","csr","sales_rep"] },
+    { key: "customer",   label: "Customer",   icon: AddressBook, path: "/app/customers?new=1",  roles: ["owner","dispatcher","office_manager","csr","sales_rep","technician"] },
+    { key: "estimate",   label: "Estimate",   icon: FileText,    path: "/app/estimates/new",    roles: ["owner","dispatcher","office_manager","csr","sales_rep","technician"] },
     { key: "invoice",    label: "Invoice",    icon: Receipt,     path: "/app/invoices/new",     roles: ["owner","dispatcher","office_manager","accountant"] },
-    { key: "finance",    label: "Finance job",icon: Bank,        path: "/app/financing",        roles: ["owner","dispatcher","office_manager","sales_rep","csr","accountant"] },
+    { key: "finance",    label: "Finance job",icon: Bank,        path: "/app/financing",        roles: ["owner","dispatcher","office_manager","sales_rep","csr","accountant","technician"] },
 ];
 
 export default function QuickCreateFAB() {

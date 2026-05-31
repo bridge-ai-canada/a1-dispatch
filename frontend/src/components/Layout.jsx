@@ -89,10 +89,16 @@ export default function Layout() {
 
     if (!user) return null;
     // Filter groups to those with at least one visible item for the role.
-    const visibleGroups = NAV_GROUPS
-        .map((g) => ({ ...g, items: g.items.filter((i) => i.roles.includes(user.role)) }))
-        .filter((g) => g.items.length > 0);
-    const navForCmdk = flatNav.filter((n) => n.roles.includes(user.role));
+    const visibleGroups = useMemo(
+        () => NAV_GROUPS
+            .map((g) => ({ ...g, items: g.items.filter((i) => i.roles.includes(user.role)) }))
+            .filter((g) => g.items.length > 0),
+        [user.role],
+    );
+    const navForCmdk = useMemo(
+        () => flatNav.filter((n) => n.roles.includes(user.role)),
+        [user.role],
+    );
 
     const handleLogout = async () => {
         await logout();

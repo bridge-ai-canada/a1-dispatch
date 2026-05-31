@@ -484,6 +484,18 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - ✅ **Env templates** — `backend/.env.example` + `frontend/.env.example` covering all required + optional variables.
 - ✅ **Tests** — `test_iteration_27_hardening.py` covers health, ready, metrics (json + prom), security headers, request-id round-trip, gzip, OPTIONS pass-through. 8/8 pass + iteration 26 + 25 still green (43/43).
 
+### Feb 2026 — Iteration 28 — Platform-Wide UX & Performance Pass
+- ✅ **Bundle splitting** — All authenticated pages converted to `React.lazy()` in `App.js`. Initial bundle now contains only auth + landing; everything else streams as the user navigates. Suspense fallback uses a minimal spinner; routes wrapped in `RouteErrorBoundary` so a stale-chunk deploy never produces a forever-spinner.
+- ✅ **Command palette** (`CommandPalette.jsx`) — `⌘K`/`Ctrl+K` global shortcut opens a fuzzy-search modal listing every page + 8 quick actions (New job/estimate/invoice/customer + jump to dispatch/analytics/integrations/webhooks). Keyboard nav (↑/↓/Enter/Esc); does NOT hijack when typing into inputs unless palette already open. Header has `cmdk-trigger` button for mouse users.
+- ✅ **Quick-create FAB** (`QuickCreateFAB.jsx`) — Floating "+" button bottom-right on every authenticated page. Fan-out menu with role-aware quick-create actions: Work order, Customer, Estimate, Invoice, Finance job. Technicians see Customer/Estimate/Finance so the FAB remains a constant UX anchor.
+- ✅ **Grouped sidebar nav** (`Layout.jsx` rewrite) — 28 flat items → 6 collapsible sections (Operations / Sales / Money / Insights / Platform / Settings). Each section's collapsed state persists to localStorage. Active link gets `#1D4ED8` accent + filled icon. Sticky header with `backdrop-blur` + soft shadow. `visibleGroups`/`navForCmdk` memoized on `user.role`.
+- ✅ **Backend perf middleware** (`perf.py`):
+  - `SlowRequestLoggerMiddleware` — logs structured `slow_request rid=… method=… path=… status=… duration_ms=…` for any request exceeding `SLOW_REQUEST_THRESHOLD_MS` (default 800 ms). All responses now carry `X-Response-Time-ms` header.
+  - `TTLCache` helper (in-memory, prefix-invalidatable) for future hot read paths.
+- ✅ **Compound indexes** (`migrations/0002_perf_indexes.py`) — added 13 indexes covering hot list-view paths: customers (name/phone/email), invoices + estimates (status × created_at DESC), activity (actor + created_at), webhook_deliveries (status + created_at), timesheets (user + started_at), jobs (assigned_to + scheduled_at), finance_applications (status + created_at).
+- ✅ **51/51 backend pytest pass + frontend 100 % pass** (iteration 28). 0 critical/blocking issues. 6 minor code-review items addressed in same pass: technician quick actions added, ErrorBoundary wraps Suspense, Cmd+K skips when input focused (unless palette open), visibleGroups memoized.
+- ⚠️ Minor non-blocking deferred: localStorage cross-tab sync for sidebar collapse state; tighten cmdk-trigger min-width at small laptops; remove window-event coupling between header trigger & palette via context.
+
 ### P1 — Remaining
 - User-supplied OAuth credentials for QuickBooks / Google / Microsoft / Zoom (UI ready, env vars needed)
 - Stripe Price IDs (`STRIPE_PRICE_STARTER`, `STRIPE_PRICE_LITE`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_ENTERPRISE`) for real billing — currently dev-mode flips plan locally.
