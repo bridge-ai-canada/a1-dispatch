@@ -17,7 +17,8 @@ _GIT_SHA = os.environ.get("GIT_SHA", "unknown")
 async def health() -> dict:
     """Liveness probe — process is up."""
     return {"status": "ok", "service": "a1-field-pro", "version": _VERSION,
-            "git_sha": _GIT_SHA, "uptime_s": int(time.time() - _BOOT_TS)}
+            "git_sha": _GIT_SHA, "uptime_s": int(time.time() - _BOOT_TS),
+            "sentry": bool(os.environ.get("SENTRY_DSN"))}
 
 
 @router.get("/health/ready")

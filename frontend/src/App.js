@@ -2,6 +2,7 @@ import "@/App.css";
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { CommandPaletteProvider } from "./context/CommandPaletteContext";
 import { Toaster } from "sonner";
 import Layout, { Protected } from "./components/Layout";
 import RouteErrorBoundary from "./components/RouteErrorBoundary";
@@ -89,6 +90,7 @@ function RouteFallback() {
 function App() {
     return (
         <AuthProvider>
+            <CommandPaletteProvider>
             <BrowserRouter>
                 <Toaster position="top-right" richColors closeButton />
                 <HashGuard>
@@ -164,6 +166,7 @@ function App() {
                 </RouteErrorBoundary>
                 </HashGuard>
             </BrowserRouter>
+            </CommandPaletteProvider>
         </AuthProvider>
     );
 }

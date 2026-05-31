@@ -1,43 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { MagnifyingGlass, ArrowRight, ArrowsClockwise } from "@phosphor-icons/react";
+import { useCommandPalette } from "../context/CommandPaletteContext";
+import { MagnifyingGlass, ArrowRight } from "@phosphor-icons/react";
 
 /**
- * Cmd+K / Ctrl+K command palette.
- *
- * - Fuzzy-search over the registered nav items + recent records
- * - Keyboard nav (↑/↓/Enter/Esc)
- * - Lives at the top of <Layout/> so it's available on every authenticated page
+ * Cmd+K / Ctrl+K command palette. State lives in CommandPaletteContext so the
+ * header trigger button can open it without dispatching synthetic events.
  */
 export default function CommandPalette({ navItems = [] }) {
-    const [open, setOpen] = useState(false);
+    const { open, close } = useCommandPalette();
     const [q, setQ] = useState("");
     const [idx, setIdx] = useState(0);
     const inputRef = useRef(null);
     const navigate = useNavigate();
     const { user } = useAuth();
-
-    // Global hotkey
-    useEffect(() => {
-        const handler = (e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-                // Don't hijack Cmd/Ctrl+K when typing in an input/textarea/contentEditable
-                // unless the palette is already open.
-                const el = document.activeElement;
-                const isEditable = el && (
-                    el.tagName === "INPUT" || el.tagName === "TEXTAREA" ||
-                    el.isContentEditable
-                );
-                if (isEditable && !open) return;
-                e.preventDefault();
-                setOpen((o) => !o);
-            }
-            if (e.key === "Escape") setOpen(false);
-        };
-        window.addEventListener("keydown", handler);
-        return () => window.removeEventListener("keydown", handler);
-    }, [open]);
 
     useEffect(() => {
         if (open) {
@@ -47,17 +24,16 @@ export default function CommandPalette({ navItems = [] }) {
         }
     }, [open]);
 
-    // Build action list — pages + quick actions
     const actions = useMemo(() => {
         const quick = [
-            { id: "qa-new-job",     label: "Create new work order",  shortcut: "N J", path: "/app/jobs?new=1" },
-            { id: "qa-new-est",     label: "Create new estimate",    shortcut: "N E", path: "/app/estimates/new" },
-            { id: "qa-new-inv",     label: "Create new invoice",     shortcut: "N I", path: "/app/invoices/new" },
-            { id: "qa-new-cust",    label: "Add customer",           shortcut: "N C", path: "/app/customers?new=1" },
-            { id: "qa-dispatch",    label: "Open dispatch board",    path: "/app/dispatch" },
-            { id: "qa-analytics",   label: "Open analytics",         path: "/app/analytics" },
-            { id: "qa-integrations",label: "Open integrations hub",  path: "/app/integrations" },
-            { id: "qa-webhooks",    label: "Open webhooks",          path: "/app/integrations/webhooks" },
+            { id: "qa-new-job",      label: "Create new work order",  shortcut: "N J", path: "/app/jobs?new=1" },
+            { id: "qa-new-est",      label: "Create new estimate",    shortcut: "N E", path: "/app/estimates/new" },
+            { id: "qa-new-inv",      label: "Create new invoice",     shortcut: "N I", path: "/app/invoices/new" },
+            { id: "qa-new-cust",     label: "Add customer",           shortcut: "N C", path: "/app/customers?new=1" },
+            { id: "qa-dispatch",     label: "Open dispatch board",    path: "/app/dispatch" },
+            { id: "qa-analytics",    label: "Open analytics",         path: "/app/analytics" },
+            { id: "qa-integrations", label: "Open integrations hub",  path: "/app/integrations" },
+            { id: "qa-webhooks",     label: "Open webhooks",          path: "/app/integrations/webhooks" },
         ];
         const pages = (navItems || []).map((n) => ({ id: "p-" + n.to, label: n.label, path: n.to }));
         return [...quick, ...pages];
@@ -66,21 +42,19 @@ export default function CommandPalette({ navItems = [] }) {
     const filtered = useMemo(() => {
         if (!q.trim()) return actions.slice(0, 12);
         const needle = q.toLowerCase();
-        return actions
-            .filter((a) => a.label.toLowerCase().includes(needle))
-            .slice(0, 12);
+        return actions.filter((a) => a.label.toLowerCase().includes(needle)).slice(0, 12);
     }, [q, actions]);
 
     const run = (a) => {
         if (a.path) navigate(a.path);
-        setOpen(false);
+        close();
     };
 
     if (!open) return null;
     return (
         <div
             className="fixed inset-0 z-[100] bg-slate-950/40 backdrop-blur-sm flex items-start justify-center pt-[12vh] px-4"
-            onClick={() => setOpen(false)}
+            onClick={close}
             data-testid="cmdk-overlay"
         >
             <div

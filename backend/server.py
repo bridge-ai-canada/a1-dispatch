@@ -19,9 +19,14 @@ from middleware import (
     RateLimitMiddleware, MetricsMiddleware,
 )
 from perf import SlowRequestLoggerMiddleware
+from observability import init_sentry
 from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates, timesheets, checklists, materials, ai, sms, branding, branches, msg_templates, subscription, tenants, api_keys, financing, analytics, integrations as integrations_router, webhooks as webhooks_router, health as health_router
 from services import sync_engine
 from migrations import runner as migration_runner
+
+# Sentry must be initialized BEFORE the FastAPI app is created so that
+# its integrations can wrap the right entry-points.
+_SENTRY_ON = init_sentry()
 
 app = FastAPI(title="A1 Field Pro API")
 api = APIRouter(prefix="/api")

@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import OfflineIndicator from "./OfflineIndicator";
 import CommandPalette from "./CommandPalette";
 import QuickCreateFAB from "./QuickCreateFAB";
+import { useCommandPalette } from "../context/CommandPaletteContext";
 
 // Nav grouped by section — reduces cognitive load (was 28 flat items)
 const NAV_GROUPS = [
@@ -86,19 +87,22 @@ export default function Layout() {
     const { user, company, logout } = useAuth();
     const navigate = useNavigate();
     const [open, setOpen] = useState(false);
+    const cmdk = useCommandPalette();
 
-    if (!user) return null;
-    // Filter groups to those with at least one visible item for the role.
+    // Memoize before any early return — hooks must run in same order every render.
+    const role = user?.role || "";
     const visibleGroups = useMemo(
         () => NAV_GROUPS
-            .map((g) => ({ ...g, items: g.items.filter((i) => i.roles.includes(user.role)) }))
+            .map((g) => ({ ...g, items: g.items.filter((i) => i.roles.includes(role)) }))
             .filter((g) => g.items.length > 0),
-        [user.role],
+        [role],
     );
     const navForCmdk = useMemo(
-        () => flatNav.filter((n) => n.roles.includes(user.role)),
-        [user.role],
+        () => flatNav.filter((n) => n.roles.includes(role)),
+        [role],
     );
+
+    if (!user) return null;
 
     const handleLogout = async () => {
         await logout();
@@ -125,15 +129,12 @@ export default function Layout() {
                     </div>
                     {/* Cmd+K hint */}
                     <button
-                        onClick={() => {
-                            const ev = new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true });
-                            window.dispatchEvent(ev);
-                        }}
+                        onClick={cmdk.toggle}
                         data-testid="cmdk-trigger"
-                        className="hidden md:flex items-center gap-2 px-3 h-9 rounded-lg border border-slate-200 bg-white text-xs text-slate-500 hover:bg-slate-50 transition-colors min-w-[260px]"
+                        className="hidden md:flex items-center gap-2 px-3 h-9 rounded-lg border border-slate-200 bg-white text-xs text-slate-500 hover:bg-slate-50 transition-colors min-w-[180px] lg:min-w-[260px]"
                     >
                         <MagnifyingGlass size={14} />
-                        <span className="flex-1 text-left">Search or jump to…</span>
+                        <span className="flex-1 text-left truncate">Search or jump to…</span>
                         <kbd className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">⌘K</kbd>
                     </button>
                     <div className="flex items-center gap-3">

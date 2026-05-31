@@ -22,6 +22,12 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         rid = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:16]
         request.state.request_id = rid
+        # Tag Sentry scope (best-effort — no-op if Sentry not initialized)
+        try:
+            import sentry_sdk
+            sentry_sdk.set_tag("request_id", rid)
+        except Exception:
+            pass
         try:
             response = await call_next(request)
         except Exception:
