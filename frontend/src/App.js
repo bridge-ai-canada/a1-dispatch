@@ -1,63 +1,69 @@
 import "@/App.css";
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { Toaster } from "sonner";
 import Layout, { Protected } from "./components/Layout";
+
+// --- Eager: auth + public pages (small, needed on first paint) ---
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import Jobs from "./pages/Jobs";
-import Schedule from "./pages/Schedule";
-import Team from "./pages/Team";
-import Customers from "./pages/Customers";
-import CustomerDetail from "./pages/CustomerDetail";
-import MyJobs from "./pages/MyJobs";
-import Settings from "./pages/Settings";
-import PaymentResult from "./pages/PaymentResult";
-import JobDetail from "./pages/JobDetail";
-import BookingWidget from "./pages/BookingWidget";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import SetupMFA from "./pages/SetupMFA";
-import AdminUsers from "./pages/AdminUsers";
-import Activity from "./pages/Activity";
-import AuthCallback from "./pages/AuthCallback";
 import VerifyEmail from "./pages/VerifyEmail";
-import Portal from "./pages/Portal";
-import RecurringJobs from "./pages/RecurringJobs";
-import Reports from "./pages/Reports";
-import Dispatch from "./pages/Dispatch";
-import NotificationPrefs from "./pages/NotificationPrefs";
-import Estimates from "./pages/Estimates";
-import EstimateBuilder from "./pages/EstimateBuilder";
-import EstimateDetail from "./pages/EstimateDetail";
-import Invoices from "./pages/Invoices";
-import InvoiceBuilder from "./pages/InvoiceBuilder";
-import InvoiceDetail from "./pages/InvoiceDetail";
-import Templates from "./pages/Templates";
-import AICenter from "./pages/AICenter";
-import Pipeline from "./pages/Pipeline";
-import PublicEstimate from "./pages/PublicEstimate";
-import PublicInvoice from "./pages/PublicInvoice";
-import BrandingSettings from "./pages/BrandingSettings";
-import Branches from "./pages/Branches";
-import MessageTemplates from "./pages/MessageTemplates";
-import Subscription from "./pages/Subscription";
-import SuperTenants from "./pages/SuperTenants";
-import ApiKeys from "./pages/ApiKeys";
-import Pricing from "./pages/Pricing";
-import TenantLanding from "./pages/TenantLanding";
-import FinancingApply from "./pages/FinancingApply";
-import FinancingContractor from "./pages/FinancingContractor";
-import FinancingAdmin from "./pages/FinancingAdmin";
-import FinancingPrograms from "./pages/FinancingPrograms";
-import Analytics from "./pages/Analytics";
-import Integrations from "./pages/Integrations";
-import Webhooks from "./pages/Webhooks";
+import AuthCallback from "./pages/AuthCallback";
+
+// --- Lazy: everything authenticated. Bundle-split per page route. ---
+const Dashboard          = lazy(() => import("./pages/Dashboard"));
+const Jobs               = lazy(() => import("./pages/Jobs"));
+const JobDetail          = lazy(() => import("./pages/JobDetail"));
+const Schedule           = lazy(() => import("./pages/Schedule"));
+const Team               = lazy(() => import("./pages/Team"));
+const Customers          = lazy(() => import("./pages/Customers"));
+const CustomerDetail     = lazy(() => import("./pages/CustomerDetail"));
+const MyJobs             = lazy(() => import("./pages/MyJobs"));
+const Settings           = lazy(() => import("./pages/Settings"));
+const AdminUsers         = lazy(() => import("./pages/AdminUsers"));
+const Activity           = lazy(() => import("./pages/Activity"));
+const RecurringJobs      = lazy(() => import("./pages/RecurringJobs"));
+const Reports            = lazy(() => import("./pages/Reports"));
+const Dispatch           = lazy(() => import("./pages/Dispatch"));
+const NotificationPrefs  = lazy(() => import("./pages/NotificationPrefs"));
+const Estimates          = lazy(() => import("./pages/Estimates"));
+const EstimateBuilder    = lazy(() => import("./pages/EstimateBuilder"));
+const EstimateDetail     = lazy(() => import("./pages/EstimateDetail"));
+const Invoices           = lazy(() => import("./pages/Invoices"));
+const InvoiceBuilder     = lazy(() => import("./pages/InvoiceBuilder"));
+const InvoiceDetail      = lazy(() => import("./pages/InvoiceDetail"));
+const Templates          = lazy(() => import("./pages/Templates"));
+const AICenter           = lazy(() => import("./pages/AICenter"));
+const Pipeline           = lazy(() => import("./pages/Pipeline"));
+const BrandingSettings   = lazy(() => import("./pages/BrandingSettings"));
+const Branches           = lazy(() => import("./pages/Branches"));
+const MessageTemplates   = lazy(() => import("./pages/MessageTemplates"));
+const Subscription       = lazy(() => import("./pages/Subscription"));
+const SuperTenants       = lazy(() => import("./pages/SuperTenants"));
+const ApiKeys            = lazy(() => import("./pages/ApiKeys"));
+const FinancingContractor= lazy(() => import("./pages/FinancingContractor"));
+const FinancingAdmin     = lazy(() => import("./pages/FinancingAdmin"));
+const FinancingPrograms  = lazy(() => import("./pages/FinancingPrograms"));
+const Analytics          = lazy(() => import("./pages/Analytics"));
+const Integrations       = lazy(() => import("./pages/Integrations"));
+const Webhooks           = lazy(() => import("./pages/Webhooks"));
+
+// --- Lazy public pages (heavy but rare) ---
+const Portal          = lazy(() => import("./pages/Portal"));
+const PaymentResult   = lazy(() => import("./pages/PaymentResult"));
+const BookingWidget   = lazy(() => import("./pages/BookingWidget"));
+const PublicEstimate  = lazy(() => import("./pages/PublicEstimate"));
+const PublicInvoice   = lazy(() => import("./pages/PublicInvoice"));
+const Pricing         = lazy(() => import("./pages/Pricing"));
+const TenantLanding   = lazy(() => import("./pages/TenantLanding"));
+const FinancingApply  = lazy(() => import("./pages/FinancingApply"));
 
 function HashGuard({ children }) {
-    // Per Emergent Auth playbook: detect session_id synchronously during render
     if (typeof window !== "undefined" && window.location.hash?.includes("session_id=")) {
         return <AuthCallback />;
     }
@@ -71,12 +77,21 @@ function HomeRouter() {
     return <Landing />;
 }
 
+function RouteFallback() {
+    return (
+        <div className="min-h-[40vh] flex items-center justify-center" data-testid="route-loading">
+            <div className="h-9 w-9 border-2 border-slate-200 border-t-[#1D4ED8] rounded-full animate-spin" />
+        </div>
+    );
+}
+
 function App() {
     return (
         <AuthProvider>
             <BrowserRouter>
-                <Toaster position="top-right" richColors />
+                <Toaster position="top-right" richColors closeButton />
                 <HashGuard>
+                <Suspense fallback={<RouteFallback />}>
                 <Routes>
                     <Route path="/" element={<HomeRouter />} />
                     <Route path="/login" element={<Login />} />
@@ -98,11 +113,7 @@ function App() {
 
                     <Route
                         path="/app"
-                        element={
-                            <Protected>
-                                <Layout />
-                            </Protected>
-                        }
+                        element={<Protected><Layout /></Protected>}
                     >
                         <Route index element={<Navigate to="dashboard" replace />} />
                         <Route path="dashboard" element={<Dashboard />} />
@@ -147,6 +158,7 @@ function App() {
 
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
+                </Suspense>
                 </HashGuard>
             </BrowserRouter>
         </AuthProvider>

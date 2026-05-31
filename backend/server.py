@@ -18,6 +18,7 @@ from middleware import (
     RequestIDMiddleware, SecurityHeadersMiddleware,
     RateLimitMiddleware, MetricsMiddleware,
 )
+from perf import SlowRequestLoggerMiddleware
 from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates, timesheets, checklists, materials, ai, sms, branding, branches, msg_templates, subscription, tenants, api_keys, financing, analytics, integrations as integrations_router, webhooks as webhooks_router, health as health_router
 from services import sync_engine
 from migrations import runner as migration_runner
@@ -289,6 +290,7 @@ if _hosts and _hosts != ["*"]:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=_hosts)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(SlowRequestLoggerMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(RequestIDMiddleware)
