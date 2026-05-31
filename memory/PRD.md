@@ -496,6 +496,23 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - ✅ **51/51 backend pytest pass + frontend 100 % pass** (iteration 28). 0 critical/blocking issues. 6 minor code-review items addressed in same pass: technician quick actions added, ErrorBoundary wraps Suspense, Cmd+K skips when input focused (unless palette open), visibleGroups memoized.
 - ⚠️ Minor non-blocking deferred: localStorage cross-tab sync for sidebar collapse state; tighten cmdk-trigger min-width at small laptops; remove window-event coupling between header trigger & palette via context.
 
+### Feb 2026 — Iteration 29 — Sentry SDK + CommandPalette Context Refactor
+- ✅ **Backend Sentry wiring** (`observability.py` + `server.py`):
+  - `init_sentry()` runs BEFORE `FastAPI()` so Starlette/FastAPI integrations wrap correctly.
+  - Silent no-op when `SENTRY_DSN` is unset — dev/test never ships events.
+  - When DSN is set: tags release as `a1-field-pro@{GIT_SHA|APP_VERSION}`, `environment={APP_ENV}`, scope tag `service=a1-field-pro-backend`, request_id per request (added in `RequestIDMiddleware`), traces_sample_rate=0.1 (env-tunable), PII off by default (SOC2).
+  - Integrations: StarletteIntegration, FastApiIntegration, AsyncioIntegration, LoggingIntegration (INFO breadcrumbs, ERROR events).
+  - `/api/health` now surfaces `sentry: bool(SENTRY_DSN)` so ops can confirm wiring.
+  - `requirements.txt` pinned `sentry-sdk==2.61.0`.
+- ✅ **Frontend Command Palette context refactor** (`context/CommandPaletteContext.jsx` + `App.js` + `Layout.jsx` + `CommandPalette.jsx`):
+  - Removed synthetic `window.dispatchEvent(new KeyboardEvent(...))` hack — `cmdk-trigger` now calls `ctx.toggle()` directly.
+  - State lives in `CommandPaletteProvider` wrapping `BrowserRouter`. Any descendant component can `useCommandPalette()` and read `{open, toggle, close}`.
+  - Global hotkey listener bound ONCE (no rebind churn) — `openRef` reads latest state inside the closure.
+  - Still skips Cmd+K when input/textarea focused unless palette is already open (no regression).
+- ✅ **Hooks order fix** — `visibleGroups` + `navForCmdk` useMemo hooks hoisted ABOVE the `if (!user) return null` early return in `Layout.jsx` (eslint `react-hooks/rules-of-hooks` now clean).
+- ✅ **Cmd+K trigger min-width relaxed** — `min-w-[180px] lg:min-w-[260px]` so 1280-px laptops aren't crowded.
+- ✅ Backend 51/51 pytest pass + frontend 100% (iteration 29). No regressions.
+
 ### P1 — Remaining
 - User-supplied OAuth credentials for QuickBooks / Google / Microsoft / Zoom (UI ready, env vars needed)
 - Stripe Price IDs (`STRIPE_PRICE_STARTER`, `STRIPE_PRICE_LITE`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_ENTERPRISE`) for real billing — currently dev-mode flips plan locally.

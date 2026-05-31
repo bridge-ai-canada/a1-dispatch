@@ -9,7 +9,6 @@ and tests never accidentally ship events. Captures:
 """
 import logging
 import os
-from typing import Optional
 
 
 def init_sentry() -> bool:
@@ -51,17 +50,8 @@ def init_sentry() -> bool:
         ],
     )
     # One-time tags shared across the process
-    with sentry_sdk.configure_scope() as scope:
-        scope.set_tag("service", "a1-field-pro-backend")
-    return True
-
-
-def capture_request_id(request_id: Optional[str]) -> None:
-    """Attach the current request_id to Sentry scope for downstream events."""
-    if not request_id:
-        return
     try:
-        import sentry_sdk
-        sentry_sdk.set_tag("request_id", request_id)
+        sentry_sdk.set_tag("service", "a1-field-pro-backend")
     except Exception:
         pass
+    return True
