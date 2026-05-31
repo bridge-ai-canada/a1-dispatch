@@ -145,7 +145,7 @@ async def startup():
     # Idempotent: ensure all existing companies have a subscription block + branding defaults.
     await db.companies.update_many(
         {"subscription": {"$exists": False}},
-        {"$set": {"subscription": {"plan": "starter", "status": "active",
+        {"$set": {"subscription": {"plan": "basic", "status": "active",
                                    "updated_at": now_iso()}}},
     )
     # Promote demo company to Pro so feature gates can be exercised.

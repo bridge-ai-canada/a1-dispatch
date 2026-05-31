@@ -11,12 +11,12 @@ from typing import Optional
 # -------------------- Subscription plans --------------------
 # Keep in sync with the marketing page + Stripe price IDs (when configured).
 PLANS = {
-    "starter": {
-        "key": "starter",
-        "name": "Starter",
-        "price_usd": 120,
+    "basic": {
+        "key": "basic",
+        "name": "Basic",
+        "price_usd": 49,
         "interval": "month",
-        "seats": 3,
+        "seats": 1,
         "features": {
             "ai_assist": False,
             "branches": False,
@@ -28,12 +28,12 @@ PLANS = {
         },
         "tagline": "For solo operators getting started.",
     },
-    "lite": {
-        "key": "lite",
-        "name": "Lite",
-        "price_usd": 220,
+    "team": {
+        "key": "team",
+        "name": "Team",
+        "price_usd": 149,
         "interval": "month",
-        "seats": 6,
+        "seats": 5,
         "features": {
             "ai_assist": False,
             "branches": False,
@@ -43,14 +43,14 @@ PLANS = {
             "white_label": True,
             "sms_reminders": True,
         },
-        "tagline": "Growing crew of up to 6.",
+        "tagline": "Growing crew of up to 5.",
     },
-    "pro": {
-        "key": "pro",
-        "name": "Pro",
-        "price_usd": 360,
+    "business": {
+        "key": "business",
+        "name": "Business",
+        "price_usd": 299,
         "interval": "month",
-        "seats": 10,
+        "seats": 15,
         "features": {
             "ai_assist": True,
             "branches": True,
@@ -63,10 +63,28 @@ PLANS = {
         "tagline": "AI tooling + multi-branch operations.",
         "featured": True,
     },
+    "pro": {
+        "key": "pro",
+        "name": "Pro",
+        "price_usd": 499,
+        "interval": "month",
+        "seats": 50,
+        "features": {
+            "ai_assist": True,
+            "branches": True,
+            "custom_domain": True,
+            "franchise": False,
+            "api_access": True,
+            "white_label": True,
+            "sms_reminders": True,
+        },
+        "tagline": "Scale to 50 seats with custom domain + API.",
+    },
     "enterprise": {
         "key": "enterprise",
         "name": "Enterprise",
-        "price_usd": 899,
+        "price_usd": 0,  # 0 = contact us for custom pricing
+        "custom_price": True,
         "interval": "month",
         "seats": 0,  # 0 = unlimited
         "features": {
@@ -78,11 +96,11 @@ PLANS = {
             "white_label": True,
             "sms_reminders": True,
         },
-        "tagline": "Franchise, custom domain, unlimited seats.",
+        "tagline": "For franchises and large organizations — custom pricing.",
     },
 }
 
-DEFAULT_PLAN = "starter"
+DEFAULT_PLAN = "basic"
 
 
 def plan(key: Optional[str]) -> dict:

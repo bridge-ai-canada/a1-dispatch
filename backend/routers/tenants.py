@@ -152,7 +152,7 @@ async def platform_metrics(user: dict = Depends(require_role("super_admin"))):
     pipeline_companies = await db.companies.aggregate([
         {"$group": {"_id": "$subscription.plan", "count": {"$sum": 1}}},
     ]).to_list(50)
-    by_plan = {item["_id"] or "starter": item["count"] for item in pipeline_companies}
+    by_plan = {item["_id"] or "basic": item["count"] for item in pipeline_companies}
     mrr = 0
     for plan_key, count in by_plan.items():
         p = _plan(plan_key)

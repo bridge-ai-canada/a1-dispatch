@@ -154,9 +154,9 @@ class TestSubscription:
         assert r.status_code == 200
         plans = r.json()
         keys = {p["key"] for p in plans}
-        assert keys == {"starter", "lite", "pro", "enterprise"}
+        assert keys == {"basic", "team", "business", "pro", "enterprise"}
         price_by_key = {p["key"]: p["price_usd"] for p in plans}
-        assert price_by_key == {"starter": 120, "lite": 220, "pro": 360, "enterprise": 899}
+        assert price_by_key == {"basic": 49, "team": 149, "business": 299, "pro": 499, "enterprise": 0}
 
     def test_my_subscription(self, owner_client):
         r = owner_client.get(f"{BASE_URL}/api/subscription")
@@ -185,7 +185,7 @@ class TestSubscription:
         owner_client.post(f"{BASE_URL}/api/subscription/change-plan", json={"plan": "pro"})
 
     def test_tech_cannot_change_plan(self, tech_client):
-        r = tech_client.post(f"{BASE_URL}/api/subscription/change-plan", json={"plan": "starter"})
+        r = tech_client.post(f"{BASE_URL}/api/subscription/change-plan", json={"plan": "basic"})
         assert r.status_code == 403
 
 
@@ -229,7 +229,7 @@ class TestBranches:
     def test_branch_plan_gate_starter(self, owner_client, super_client, company_id):
         # super-admin flips this tenant to starter
         r = super_client.patch(
-            f"{BASE_URL}/api/subscription/admin/{company_id}", json={"plan": "starter"},
+            f"{BASE_URL}/api/subscription/admin/{company_id}", json={"plan": "basic"},
         )
         assert r.status_code == 200
         # Now attempting to create a branch should 402
@@ -324,7 +324,7 @@ class TestApiKeys:
         assert rec["active"] is False
 
     def test_api_key_plan_gate_starter(self, owner_client, super_client, company_id):
-        super_client.patch(f"{BASE_URL}/api/subscription/admin/{company_id}", json={"plan": "starter"})
+        super_client.patch(f"{BASE_URL}/api/subscription/admin/{company_id}", json={"plan": "basic"})
         r = owner_client.post(f"{BASE_URL}/api/api-keys", json={"name": "TEST_should_fail"})
         assert r.status_code == 402, f"expected 402 got {r.status_code}"
         super_client.patch(f"{BASE_URL}/api/subscription/admin/{company_id}", json={"plan": "pro"})

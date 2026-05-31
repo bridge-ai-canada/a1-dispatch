@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import api, { formatApiError } from "../lib/api";
 import { toast } from "sonner";
-import { CheckCircle, Star, Lightning, Crown, Sparkle } from "@phosphor-icons/react";
+import { CheckCircle, Star, Lightning, Crown, Sparkle, Buildings } from "@phosphor-icons/react";
 
-const ICONS = { starter: Sparkle, lite: Lightning, pro: Star, enterprise: Crown };
+const ICONS = { basic: Sparkle, team: Lightning, business: Star, pro: Buildings, enterprise: Crown };
 
 export default function Subscription() {
     const [plans, setPlans] = useState([]);
@@ -61,10 +61,11 @@ export default function Subscription() {
                 </div>
             )}
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4">
                 {plans.map((p) => {
                     const Icon = ICONS[p.key] || Sparkle;
                     const isCurrent = sub?.plan?.key === p.key;
+                    const isCustom = p.custom_price || p.key === "enterprise";
                     return (
                         <div key={p.key} className={`rounded-2xl border-2 p-5 space-y-4 ${p.featured ? "border-[#1D4ED8] shadow-lg" : "border-slate-200"} ${isCurrent ? "bg-slate-50" : "bg-white"}`} data-testid={`plan-${p.key}`}>
                             {p.featured && <div className="inline-block text-[10px] font-bold uppercase tracking-wider bg-[#1D4ED8] text-white px-2 py-0.5 rounded-full">Most popular</div>}
@@ -73,29 +74,46 @@ export default function Subscription() {
                                 <div className="font-extrabold text-xl">{p.name}</div>
                             </div>
                             <div>
-                                <div className="text-4xl font-extrabold">${p.price_usd}</div>
-                                <div className="text-xs text-slate-500">/ {p.interval}</div>
+                                {isCustom ? (
+                                    <>
+                                        <div className="text-2xl font-extrabold">Custom</div>
+                                        <div className="text-xs text-slate-500">Contact for pricing</div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="text-4xl font-extrabold">${p.price_usd}</div>
+                                        <div className="text-xs text-slate-500">/ {p.interval}</div>
+                                    </>
+                                )}
                             </div>
                             <div className="text-xs text-slate-600">{p.tagline}</div>
                             <ul className="space-y-1 text-xs">
-                                <li className="flex items-center gap-1"><CheckCircle size={14} className="text-green-600"/> {p.seats === 0 ? "Unlimited seats" : `${p.seats} seats`}</li>
+                                <li className="flex items-center gap-1"><CheckCircle size={14} className="text-green-600"/> {p.seats === 0 ? "Unlimited seats" : `${p.seats} seat${p.seats === 1 ? "" : "s"}`}</li>
                                 <li className={`flex items-center gap-1 ${p.features.ai_assist ? "" : "text-slate-400 line-through"}`}><CheckCircle size={14} className={p.features.ai_assist ? "text-green-600" : "text-slate-300"}/> AI assistant</li>
                                 <li className={`flex items-center gap-1 ${p.features.branches ? "" : "text-slate-400 line-through"}`}><CheckCircle size={14} className={p.features.branches ? "text-green-600" : "text-slate-300"}/> Multi-branch</li>
                                 <li className={`flex items-center gap-1 ${p.features.api_access ? "" : "text-slate-400 line-through"}`}><CheckCircle size={14} className={p.features.api_access ? "text-green-600" : "text-slate-300"}/> API access</li>
                                 <li className={`flex items-center gap-1 ${p.features.custom_domain ? "" : "text-slate-400 line-through"}`}><CheckCircle size={14} className={p.features.custom_domain ? "text-green-600" : "text-slate-300"}/> Custom domain</li>
                                 <li className={`flex items-center gap-1 ${p.features.franchise ? "" : "text-slate-400 line-through"}`}><CheckCircle size={14} className={p.features.franchise ? "text-green-600" : "text-slate-300"}/> Franchise</li>
                             </ul>
-                            <button
-                                disabled={isCurrent || busy === p.key}
-                                onClick={() => checkout(p.key)}
-                                className={`w-full px-4 py-3 rounded-xl font-bold text-sm transition ${
-                                    isCurrent ? "bg-slate-200 text-slate-500 cursor-default" :
-                                    p.featured ? "bg-[#1D4ED8] text-white hover:bg-blue-700" :
-                                    "bg-slate-900 text-white hover:bg-black"
-                                }`}
-                                data-testid={`plan-cta-${p.key}`}>
-                                {isCurrent ? "Current plan" : busy === p.key ? "Loading…" : `Switch to ${p.name}`}
-                            </button>
+                            {isCustom ? (
+                                <a href="mailto:sales@a1fieldpro.com?subject=Enterprise%20Pricing"
+                                    className="block w-full text-center px-4 py-3 rounded-xl font-bold text-sm transition bg-slate-900 text-white hover:bg-black"
+                                    data-testid={`plan-cta-${p.key}`}>
+                                    Contact sales
+                                </a>
+                            ) : (
+                                <button
+                                    disabled={isCurrent || busy === p.key}
+                                    onClick={() => checkout(p.key)}
+                                    className={`w-full px-4 py-3 rounded-xl font-bold text-sm transition ${
+                                        isCurrent ? "bg-slate-200 text-slate-500 cursor-default" :
+                                        p.featured ? "bg-[#1D4ED8] text-white hover:bg-blue-700" :
+                                        "bg-slate-900 text-white hover:bg-black"
+                                    }`}
+                                    data-testid={`plan-cta-${p.key}`}>
+                                    {isCurrent ? "Current plan" : busy === p.key ? "Loading…" : `Switch to ${p.name}`}
+                                </button>
+                            )}
                         </div>
                     );
                 })}

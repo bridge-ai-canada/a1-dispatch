@@ -17,7 +17,7 @@ from whitelabel_service import PLANS, plan as get_plan, seat_limit
 
 router = APIRouter()
 
-PLAN_KEYS = Literal["starter", "lite", "pro", "enterprise"]
+PLAN_KEYS = Literal["basic", "team", "business", "pro", "enterprise"]
 
 
 class ChangePlanIn(BaseModel):
@@ -48,7 +48,7 @@ async def my_subscription(user: dict = Depends(get_current_user)):
         {"id": user["company_id"]}, {"_id": 0, "subscription": 1, "name": 1},
     ) or {}
     sub = company.get("subscription") or {}
-    plan_key = sub.get("plan") or "starter"
+    plan_key = sub.get("plan") or "basic"
     p = get_plan(plan_key)
     seats_used = await db.users.count_documents({"company_id": user["company_id"], "active": True})
     limit = sub.get("seats_override") or seat_limit(plan_key)

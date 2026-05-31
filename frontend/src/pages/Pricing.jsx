@@ -3,9 +3,9 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import { API_BASE } from "../lib/api";
 import Brand from "../components/Brand";
-import { CheckCircle, X, Star, Lightning, Crown, Sparkle, ArrowRight, Check } from "@phosphor-icons/react";
+import { CheckCircle, X, Star, Lightning, Crown, Sparkle, Buildings, ArrowRight, Check } from "@phosphor-icons/react";
 
-const ICONS = { starter: Sparkle, lite: Lightning, pro: Star, enterprise: Crown };
+const ICONS = { basic: Sparkle, team: Lightning, business: Star, pro: Buildings, enterprise: Crown };
 const FEATURE_ROWS = [
     { key: "seats",          label: "Team seats",     render: (p) => p.seats === 0 ? "Unlimited" : p.seats },
     { key: "white_label",    label: "White-label branding", flag: true },
@@ -69,11 +69,12 @@ export default function Pricing() {
 
             {/* Plan cards */}
             <section className="max-w-7xl mx-auto px-6 pb-16">
-                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5" data-testid="pricing-cards">
+                <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4" data-testid="pricing-cards">
                     {plans.map((p) => {
                         const Icon = ICONS[p.key] || Sparkle;
+                        const isCustom = p.custom_price || p.key === "enterprise";
                         const monthly = p.price_usd;
-                        const display = billing === "annual" ? Math.round(monthly * 0.85) : monthly;
+                        const display = isCustom ? null : (billing === "annual" ? Math.round(monthly * 0.85) : monthly);
                         return (
                             <div key={p.key} className={`rounded-2xl border-2 p-6 space-y-5 transition hover:shadow-xl ${p.featured ? "border-[#1D4ED8] shadow-lg relative" : "border-slate-200"}`} data-testid={`pricing-card-${p.key}`}>
                                 {p.featured && <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-bold uppercase tracking-wider bg-[#1D4ED8] text-white px-2 py-1 rounded-full">Most popular</div>}
@@ -82,15 +83,24 @@ export default function Pricing() {
                                     <div className="font-extrabold text-xl">{p.name}</div>
                                 </div>
                                 <div>
-                                    <div className="flex items-baseline gap-1">
-                                        <div className="text-5xl font-extrabold tracking-tighter">${display}</div>
-                                        <div className="text-sm text-slate-500">/ mo</div>
-                                    </div>
-                                    {billing === "annual" && <div className="text-[10px] text-green-700 font-bold mt-1">${display * 12}/yr billed annually</div>}
+                                    {isCustom ? (
+                                        <div>
+                                            <div className="text-3xl font-extrabold tracking-tighter">Custom</div>
+                                            <div className="text-xs text-slate-500 mt-1">Contact for pricing</div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-baseline gap-1">
+                                                <div className="text-5xl font-extrabold tracking-tighter">${display}</div>
+                                                <div className="text-sm text-slate-500">/ mo</div>
+                                            </div>
+                                            {billing === "annual" && <div className="text-[10px] text-green-700 font-bold mt-1">${display * 12}/yr billed annually</div>}
+                                        </>
+                                    )}
                                 </div>
                                 <div className="text-sm text-slate-600 min-h-[2.5rem]">{p.tagline}</div>
                                 <ul className="space-y-2 text-sm">
-                                    <li className="flex items-center gap-2"><Check size={14} className="text-green-600 flex-shrink-0"/> {p.seats === 0 ? "Unlimited seats" : `${p.seats} team seats`}</li>
+                                    <li className="flex items-center gap-2"><Check size={14} className="text-green-600 flex-shrink-0"/> {p.seats === 0 ? "Unlimited seats" : `${p.seats} team seat${p.seats === 1 ? "" : "s"}`}</li>
                                     {[
                                         ["ai_assist", "AI assistant"],
                                         ["branches", "Multi-branch"],
@@ -104,12 +114,19 @@ export default function Pricing() {
                                         </li>
                                     ))}
                                 </ul>
-                                <Link to="/register" data-testid={`pricing-cta-${p.key}`}
-                                    className={`block w-full text-center px-4 py-3 rounded-xl font-bold text-sm transition ${
-                                        p.featured ? "bg-[#1D4ED8] text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-black"
-                                    }`}>
-                                    Start free trial <ArrowRight size={14} className="inline ml-1"/>
-                                </Link>
+                                {isCustom ? (
+                                    <a href="mailto:sales@a1fieldpro.com?subject=Enterprise%20Pricing" data-testid={`pricing-cta-${p.key}`}
+                                        className="block w-full text-center px-4 py-3 rounded-xl font-bold text-sm transition bg-slate-900 text-white hover:bg-black">
+                                        Contact sales <ArrowRight size={14} className="inline ml-1"/>
+                                    </a>
+                                ) : (
+                                    <Link to="/register" data-testid={`pricing-cta-${p.key}`}
+                                        className={`block w-full text-center px-4 py-3 rounded-xl font-bold text-sm transition ${
+                                            p.featured ? "bg-[#1D4ED8] text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-black"
+                                        }`}>
+                                        Start free trial <ArrowRight size={14} className="inline ml-1"/>
+                                    </Link>
+                                )}
                             </div>
                         );
                     })}

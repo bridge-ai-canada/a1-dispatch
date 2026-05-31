@@ -16,7 +16,7 @@ async def up(db) -> None:
     # Default subscription block for legacy companies created before billing existed
     await db.companies.update_many(
         {"subscription": {"$exists": False}},
-        {"$set": {"subscription": {"plan": "starter", "status": "active"}}},
+        {"$set": {"subscription": {"plan": "basic", "status": "active"}}},
     )
 
     # Defensive baseline indexes (no-op if already present)

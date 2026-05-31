@@ -3,7 +3,7 @@ import api, { formatApiError } from "../lib/api";
 import { toast } from "sonner";
 import { Buildings, MagnifyingGlass, DownloadSimple, Pause, Play, Trash, ChartBar } from "@phosphor-icons/react";
 
-const PLAN_COLORS = { starter: "bg-slate-200 text-slate-800", lite: "bg-blue-100 text-blue-800", pro: "bg-violet-100 text-violet-800", enterprise: "bg-amber-100 text-amber-800" };
+const PLAN_COLORS = { basic: "bg-slate-200 text-slate-800", team: "bg-blue-100 text-blue-800", business: "bg-violet-100 text-violet-800", pro: "bg-amber-100 text-amber-800", enterprise: "bg-rose-100 text-rose-800" };
 
 export default function SuperTenants() {
     const [tenants, setTenants] = useState([]);
@@ -85,7 +85,7 @@ export default function SuperTenants() {
                         <div className="text-xs uppercase tracking-wider text-slate-500">By plan</div>
                         <div className="flex flex-wrap gap-1 mt-2">
                             {Object.entries(metrics.by_plan || {}).map(([k, v]) => (
-                                <span key={k} className={`text-xs font-bold px-2 py-1 rounded ${PLAN_COLORS[k] || PLAN_COLORS.starter}`}>{k}: {v}</span>
+                                <span key={k} className={`text-xs font-bold px-2 py-1 rounded ${PLAN_COLORS[k] || PLAN_COLORS.basic}`}>{k}: {v}</span>
                             ))}
                         </div>
                     </div>
@@ -101,8 +101,9 @@ export default function SuperTenants() {
                 </div>
                 <select value={planFilter} onChange={(e) => setPlanFilter(e.target.value)} className="h-10 px-3 rounded-lg border border-slate-300 text-sm" data-testid="tenant-plan-filter">
                     <option value="">All plans</option>
-                    <option value="starter">Starter</option>
-                    <option value="lite">Lite</option>
+                    <option value="basic">Basic</option>
+                    <option value="team">Team</option>
+                    <option value="business">Business</option>
                     <option value="pro">Pro</option>
                     <option value="enterprise">Enterprise</option>
                 </select>
@@ -127,14 +128,14 @@ export default function SuperTenants() {
                         <tbody>
                             {tenants.map((c) => {
                                 const status = c.subscription?.status || "active";
-                                const plan = c.subscription?.plan || "starter";
+                                const plan = c.subscription?.plan || "basic";
                                 return (
                                     <tr key={c.id} className="border-t border-slate-100" data-testid={`tenant-row-${c.id}`}>
                                         <td className="p-3">
                                             <div className="font-bold text-slate-900">{c.name || "—"}</div>
                                             <div className="text-[10px] text-slate-500">{c.industry || ""} · {c.id.slice(0, 8)}</div>
                                         </td>
-                                        <td className="p-3"><span className={`text-xs font-bold px-2 py-1 rounded ${PLAN_COLORS[plan] || PLAN_COLORS.starter}`}>{plan}</span></td>
+                                        <td className="p-3"><span className={`text-xs font-bold px-2 py-1 rounded ${PLAN_COLORS[plan] || PLAN_COLORS.basic}`}>{plan}</span></td>
                                         <td className="p-3"><span className={`text-xs font-bold ${status === "suspended" ? "text-rose-700" : "text-green-700"}`}>{status}</span></td>
                                         <td className="p-3 text-right font-mono">{c.users_count || 0}</td>
                                         <td className="p-3 text-right font-mono">{c.jobs_count || 0}</td>
