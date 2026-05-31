@@ -513,6 +513,31 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - ✅ **Cmd+K trigger min-width relaxed** — `min-w-[180px] lg:min-w-[260px]` so 1280-px laptops aren't crowded.
 - ✅ Backend 51/51 pytest pass + frontend 100% (iteration 29). No regressions.
 
+### Feb 2026 — Iteration 30 — FINAL pre-deploy validation + Pricing Update
+- ✅ **New 5-tier pricing** replaces previous 4-tier:
+  - **Basic** — $49 /mo · 1 seat · "For solo operators getting started"
+  - **Team** — $149 /mo · 5 seats · "Growing crew of up to 5"
+  - **Business** — $299 /mo · 15 seats · *Most popular* · AI + Branches + API + White-label
+  - **Pro** — $499 /mo · 50 seats · AI + Branches + Custom domain + API
+  - **Enterprise** — Custom pricing (contact sales) · Unlimited seats · all features incl. Franchise
+- ✅ Pricing updated everywhere: `backend/whitelabel_service.py` (PLANS catalog), `routers/subscription.py` (PLAN_KEYS Literal), `routers/tenants.py`, `server.py` seed, `frontend/src/pages/{Pricing,Subscription,SuperTenants}.jsx`. Public `/pricing`, `/app/settings/subscription`, and `/app/super/tenants` all render 5 cards; Enterprise shows "Custom" + "Contact sales" mailto button.
+- ✅ **Migration 0003_rename_plans** applied automatically on first boot — maps legacy `starter → basic`, `lite → team`, `pro → business`. Idempotent; stamps `subscription.migrated_from` for audit.
+- ✅ **Tests updated** — `test_iteration_19` covers new keys + prices. Teardown now restores to `business` (post-migration default).
+- ✅ **Final E2E validation (iteration 30 testing agent):**
+  - Backend **88/88 pytest** (test_iteration_19 + 25 + 26 + 27) PASS in ~14 s.
+  - Frontend 100% — all critical flows (login as owner/tech/super, Cmd+K navigation, FAB role-filter, lazy routes, Integrations hub, Webhooks, Analytics, Subscription, Super Tenants) verified.
+  - Security headers (HSTS, X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy, X-Request-ID, X-Response-Time-ms) present.
+  - Sentry SDK no-op verified when DSN unset; `/api/health` exposes `sentry: false`.
+  - **Zero blocking bugs.** Testing agent auto-fixed one duplicate-option bug in `SuperTenants.jsx` plan filter (leftover from migration).
+- ✅ **Polish applied this iteration**: FAB position bumped to `sm:bottom-6 sm:right-6` to coexist with preview shell badge; `test_iteration_19.test_change_plan_owner` teardown restores to `business`; demo subscription document reset.
+
+### Production Readiness — GREEN ✅
+- All artifacts present: Dockerfiles, docker-compose, Terraform (VPC + ECS + ALB + autoscaling), CI/CD (CI + Security + Deploy + Backup), 5 ops scripts, 5 docs (DEPLOYMENT/LAUNCH_CHECKLIST/SECURITY/RUNBOOK/SOC2_CHECKLIST).
+- 3 idempotent migrations: 0001_initial, 0002_perf_indexes, 0003_rename_plans — all auto-applied on startup.
+- 9 third-party integrations + 14 outbound webhook event types + APScheduler sync engine — all wired with graceful degradation.
+- Sentry SDK installed + scoped per-request; activates when `SENTRY_DSN` is set.
+- 88 pytest tests + frontend smoke flows green. Ready to tag `v1.0.0` and run `.github/workflows/deploy.yml`.
+
 ### P1 — Remaining
 - User-supplied OAuth credentials for QuickBooks / Google / Microsoft / Zoom (UI ready, env vars needed)
 - Stripe Price IDs (`STRIPE_PRICE_STARTER`, `STRIPE_PRICE_LITE`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_ENTERPRISE`) for real billing — currently dev-mode flips plan locally.

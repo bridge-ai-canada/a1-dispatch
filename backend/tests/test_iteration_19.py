@@ -181,8 +181,8 @@ class TestSubscription:
         # Verify plan flipped
         sub = owner_client.get(f"{BASE_URL}/api/subscription").json()
         assert sub["plan"]["key"] == "enterprise"
-        # Restore to pro
-        owner_client.post(f"{BASE_URL}/api/subscription/change-plan", json={"plan": "pro"})
+        # Restore to business (post-migration default for the demo tenant)
+        owner_client.post(f"{BASE_URL}/api/subscription/change-plan", json={"plan": "business"})
 
     def test_tech_cannot_change_plan(self, tech_client):
         r = tech_client.post(f"{BASE_URL}/api/subscription/change-plan", json={"plan": "basic"})

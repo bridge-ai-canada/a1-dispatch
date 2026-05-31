@@ -28,7 +28,7 @@ export default function QuickCreateFAB() {
     if (items.length === 0) return null;
 
     return (
-        <div className="fixed bottom-5 right-5 z-40" data-testid="fab">
+        <div className="fixed bottom-5 right-5 z-40 sm:bottom-6 sm:right-6" data-testid="fab">
             {/* Backdrop when expanded */}
             {open && (
                 <div className="fixed inset-0 -z-10" onClick={() => setOpen(false)} />
