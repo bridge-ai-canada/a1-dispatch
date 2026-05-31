@@ -1,0 +1,22 @@
+# Avoid bloating Docker images with junk
+**/node_modules
+**/.git
+**/.gitignore
+**/.env
+**/.env.local
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/test_reports
+**/.emergent
+**/dist
+**/build
+**/.next
+**/.cache
+**/.DS_Store
+*.log
+*.md
+docs/
+infrastructure/
+mobile/
+memory/

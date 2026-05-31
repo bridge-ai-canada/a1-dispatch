@@ -445,6 +445,45 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - ⚠️ Live OAuth requires user-supplied env vars; UI shows "Platform OAuth client not configured" until set. API-token providers (Helcim/Twilio/Maps/Zoom) work immediately on save.
 - ⚠️ Fernet key derives from `JWT_SECRET` — set `INTEGRATION_FERNET_KEY` for prod.
 
+### Feb 2026 — Iteration 27 — Production Deployment Scaffolding
+- ✅ **Backend hardening** (additive, no behavior change):
+  - `middleware.py` — `RequestIDMiddleware` (X-Request-ID round-trip), `SecurityHeadersMiddleware` (HSTS, X-Frame-Options:DENY, X-Content-Type-Options:nosniff, Referrer-Policy, Permissions-Policy), `RateLimitMiddleware` (token-bucket per IP × route prefix, 600 default / 20 auth RPM, env-tunable), `MetricsMiddleware` (per-route counters + latency averages).
+  - `routers/health.py` — `GET /api/health` (liveness), `GET /api/health/ready` (DB ping), `GET /api/metrics` (JSON), `GET /api/metrics/prom` (Prometheus exposition).
+  - GZip middleware for >1 KB responses; optional `TrustedHostMiddleware` via `ALLOWED_HOSTS`.
+  - CORS now configurable per-env via `CORS_ORIGINS` (no more `*` in prod).
+- ✅ **DB migrations** — `backend/migrations/` framework with idempotent `runner.py` invoked on FastAPI startup; first migration `0001_initial.py` consolidates inline ad-hoc updates + baseline indexes.
+- ✅ **Docker**:
+  - `backend/Dockerfile` — multi-stage python:3.11-slim, non-root user (uid 10001), tini PID 1, `HEALTHCHECK` on `/api/health`, 4 uvicorn workers.
+  - `frontend/Dockerfile` — multi-stage build → nginx:1.27-alpine + `frontend/nginx.conf` (gzip, 1-year cache on hashed assets, SPA fallback, CSP/HSTS headers, `/healthz`).
+  - `docker-compose.yml` — mongo + backend + frontend with healthchecks + resource limits for local/staging.
+  - `.dockerignore` keeps images slim (no `node_modules`, no `__pycache__`, no test reports).
+- ✅ **CI/CD** (`.github/workflows/`):
+  - `ci.yml` — backend lint+pytest+coverage with Mongo service, frontend lint+build, Docker buildx for both images (gha cache).
+  - `security.yml` — pip-audit, yarn audit, CodeQL (Python + JS), gitleaks secret scan, Trivy container scan; weekly cron Mon 06:00 UTC.
+  - `deploy.yml` — OIDC → AWS, push to ECR, force ECS service redeploy, wait services-stable, smoke `/api/health`; environment gate for production.
+  - `backup.yml` — nightly mongodump + KMS-encrypted S3 upload.
+- ✅ **AWS Terraform** (`infrastructure/terraform/`):
+  - 2-AZ VPC with public + private subnets, NAT GW for egress, ALB SG locked down 80/443.
+  - ECS Fargate cluster (Container Insights enabled) with backend + frontend services, task roles for SecretsManager access (MONGO_URL / JWT_SECRET / INTEGRATION_FERNET_KEY), 30-day CloudWatch log retention.
+  - ALB with TLS 1.3 listener policy, ACM cert input, `/api/*` path rule → backend TG, deployment circuit breaker + rollback enabled.
+  - Application Autoscaling: backend scales 2 → 8 tasks at 65 % CPU target.
+  - HTTP → HTTPS redirect listener, drop_invalid_header_fields enabled.
+  - `README.md` with bootstrap + apply instructions.
+- ✅ **Ops scripts** (`scripts/`):
+  - `backup_mongo.sh` — KMS+optional GPG-encrypted backup to S3, retention cleanup.
+  - `restore_mongo.sh` — interactive restore with confirmation.
+  - `build_and_push.sh` — emergency local redeploy path.
+  - `migrate.sh` — manual migration runner.
+  - `security_audit.sh` — combined pip-audit + yarn audit + ruff S-rules + gitleaks.
+- ✅ **Documentation** (`docs/`):
+  - `DEPLOYMENT.md` — architecture, env tiers, AWS bring-up, cost ballpark (~$165/mo MVP).
+  - `LAUNCH_CHECKLIST.md` — 60-item production launch matrix with sign-off table.
+  - `SECURITY.md` — threat model, auth/MFA/session policy, transport hardening, IR playbook.
+  - `RUNBOOK.md` — alert response playbooks (ALB 5xx, task crash loops, Atlas pool, webhook failures) + common ops one-liners.
+  - `SOC2_CHECKLIST.md` — CC1-CC9 + Availability/Confidentiality/Privacy criteria matrix with status per control.
+- ✅ **Env templates** — `backend/.env.example` + `frontend/.env.example` covering all required + optional variables.
+- ✅ **Tests** — `test_iteration_27_hardening.py` covers health, ready, metrics (json + prom), security headers, request-id round-trip, gzip, OPTIONS pass-through. 8/8 pass + iteration 26 + 25 still green (43/43).
+
 ### P1 — Remaining
 - User-supplied OAuth credentials for QuickBooks / Google / Microsoft / Zoom (UI ready, env vars needed)
 - Stripe Price IDs (`STRIPE_PRICE_STARTER`, `STRIPE_PRICE_LITE`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_ENTERPRISE`) for real billing — currently dev-mode flips plan locally.

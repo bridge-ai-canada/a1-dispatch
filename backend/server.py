@@ -5,6 +5,8 @@ from datetime import datetime, timezone, timedelta
 
 from fastapi import FastAPI, APIRouter
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from deps import (
     db, client, logger, now_iso,
@@ -12,8 +14,13 @@ from deps import (
     init_storage,
     hash_password, verify_password,
 )
-from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates, timesheets, checklists, materials, ai, sms, branding, branches, msg_templates, subscription, tenants, api_keys, financing, analytics, integrations as integrations_router, webhooks as webhooks_router
+from middleware import (
+    RequestIDMiddleware, SecurityHeadersMiddleware,
+    RateLimitMiddleware, MetricsMiddleware,
+)
+from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates, timesheets, checklists, materials, ai, sms, branding, branches, msg_templates, subscription, tenants, api_keys, financing, analytics, integrations as integrations_router, webhooks as webhooks_router, health as health_router
 from services import sync_engine
+from migrations import runner as migration_runner
 
 app = FastAPI(title="A1 Field Pro API")
 api = APIRouter(prefix="/api")
@@ -50,6 +57,7 @@ api.include_router(financing.router)
 api.include_router(analytics.router)
 api.include_router(integrations_router.router)
 api.include_router(webhooks_router.router)
+api.include_router(health_router.router)
 
 
 @api.get("/")
@@ -143,6 +151,10 @@ async def startup():
             {"$set": {"subscription.plan": "pro", "subscription.status": "active"}},
         )
     await seed_demo()
+    try:
+        await migration_runner.run_pending()
+    except Exception as e:
+        logger.error(f"migrations failed: {e}")
     try:
         sync_engine.start()
     except Exception as e:
@@ -263,6 +275,7 @@ async def seed_demo():
 
 app.include_router(api)
 
+# --- Production middleware (order matters: outermost first) ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()],
@@ -270,6 +283,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Optional host allow-list (set ALLOWED_HOSTS="api.example.com,localhost" in prod)
+_hosts = [h.strip() for h in os.environ.get("ALLOWED_HOSTS", "*").split(",") if h.strip()]
+if _hosts and _hosts != ["*"]:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=_hosts)
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(MetricsMiddleware)
+app.add_middleware(RequestIDMiddleware)
 
 
 @app.on_event("shutdown")
