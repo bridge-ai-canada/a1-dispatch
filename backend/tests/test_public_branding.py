@@ -50,9 +50,12 @@ def test_public_asset_logo_when_present():
     assert ct.startswith("image/") or ct == "application/octet-stream", ct
 
 
-def test_pricing_plans_still_returns_4():
+def test_pricing_plans_returns_full_catalog():
+    """5-tier catalog (basic / team / business / pro / enterprise)."""
     r = requests.get(f"{BASE_URL}/api/subscription/plans", timeout=15)
     assert r.status_code == 200
     plans = r.json()
     assert isinstance(plans, list)
-    assert len(plans) == 4, f"expected 4 plans, got {len(plans)}"
+    assert len(plans) == 5, f"expected 5 plans, got {len(plans)}"
+    keys = {p["key"] for p in plans}
+    assert keys == {"basic", "team", "business", "pro", "enterprise"}

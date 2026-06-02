@@ -4,7 +4,7 @@ import io
 from typing import Optional
 from fastapi import APIRouter, Depends, Query, Response
 
-from deps import db, get_current_user, require_role
+from deps import db, require_role
 
 
 router = APIRouter()

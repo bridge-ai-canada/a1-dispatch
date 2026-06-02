@@ -7,10 +7,10 @@ import hashlib
 import secrets
 import uuid
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
-from deps import db, now_iso, get_current_user, require_role, log_activity
+from deps import db, now_iso, require_role, log_activity
 from whitelabel_service import has_feature
 
 router = APIRouter()

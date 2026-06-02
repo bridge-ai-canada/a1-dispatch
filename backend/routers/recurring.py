@@ -5,7 +5,7 @@ list call (and on a manual /run) we materialize all due ones into real jobs.
 """
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Optional, Literal
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 
 from deps import (

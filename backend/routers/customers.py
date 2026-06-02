@@ -266,7 +266,8 @@ async def customer_ai_summary(customer_id: str, user: dict = Depends(get_current
             "\n\nReturn the JSON now."
         )
         response = await chat.send_message(UserMessage(text=prompt))
-        import json as _json, re as _re
+        import json as _json
+        import re as _re
         text = str(response).strip()
         m = _re.search(r"\{.*\}", text, _re.DOTALL)
         parsed = {}

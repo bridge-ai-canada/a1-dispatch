@@ -128,9 +128,9 @@ def test_job_crud(owner_session):
     assert r.status_code == 200 and r.json()["id"] == jid
 
     # PATCH
-    r = owner_session.patch(f"{API}/jobs/{jid}", json={"status": "scheduled", "price": 275.0}, timeout=10)
+    r = owner_session.patch(f"{API}/jobs/{jid}", json={"status": "scheduled_installation", "price": 275.0}, timeout=10)
     assert r.status_code == 200
-    assert r.json()["status"] == "scheduled"
+    assert r.json()["status"] == "scheduled_installation"
     assert r.json()["price"] == 275.0
 
     # DELETE

@@ -13,7 +13,6 @@ Tests:
 - Tenant isolation
 """
 import os
-import re
 import time
 
 import pytest

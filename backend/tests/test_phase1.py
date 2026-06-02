@@ -55,7 +55,7 @@ def test_patch_scheduled_at_promotes_unscheduled(owner_session, fresh_job):
     assert r.status_code == 200
     body = r.json()
     assert body["scheduled_at"].startswith("2026-02-01")
-    assert body["status"] == "scheduled"
+    assert body["status"] == "scheduled_installation"
 
 
 # ---------- Photo upload + delete ----------

@@ -197,7 +197,7 @@ class TestJobActivityEvents:
         assert meta.get("title") == title
         assert "status" in meta
 
-    @pytest.mark.parametrize("new_status", ["scheduled", "in_progress", "completed", "cancelled"])
+    @pytest.mark.parametrize("new_status", ["scheduled_installation", "in_progress", "completed", "cancelled"])
     def test_jobs_status_change_activity_logged(self, demo_headers, new_status):
         title = f"TEST_ACT_{new_status}_{uuid.uuid4().hex[:6]}"
         r = requests.post(f"{API}/jobs",

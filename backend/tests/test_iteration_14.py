@@ -13,7 +13,6 @@ Tests:
 import os
 import asyncio
 import json
-import uuid
 import time
 import pytest
 import requests
@@ -204,7 +203,6 @@ class TestGeocode:
         loc = (job or {}).get("location") or {}
         assert loc.get("lat") is not None, f"second job missing location: {job}"
         # Verify cache row exists (via direct DB)
-        import motor.motor_asyncio
         from pymongo import MongoClient
         mongo_url = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
         db_name = os.environ.get("DB_NAME", "a1fieldpro")
@@ -303,6 +301,8 @@ async def test_send_push_pay_skipped_when_payment_received_false():
     """Directly invoke send_push_to_user with tag='pay-xxx' and prefs payment_received=False."""
     import sys
     sys.path.insert(0, "/app/backend")
+    import push_service
+    push_service._VAPID_BROKEN = False  # reset module-level flag from prior tests
     from push_service import send_push_to_user
     from deps import db
     # Find tech user id

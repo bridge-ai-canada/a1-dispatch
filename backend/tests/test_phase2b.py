@@ -1,7 +1,6 @@
 """Phase 2B tests: Auth + MFA + Sessions + Activity + Users + Invite + Roles config."""
 import os
 import uuid
-import time
 import pytest
 import pyotp
 import requests

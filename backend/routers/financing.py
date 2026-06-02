@@ -9,8 +9,7 @@ Routes:
 """
 import secrets
 import uuid
-from datetime import datetime, timezone, timedelta
-from typing import Optional, Literal, List
+from typing import Optional, Literal
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field, EmailStr
 
@@ -408,7 +407,6 @@ async def create_from_job(
     sms_result = None
     if body.send_sms:
         import sms_service
-        from urllib.parse import urlparse
         phone = doc.get("customer_phone")
         if not phone:
             sms_result = {"ok": False, "error": "no_customer_phone"}

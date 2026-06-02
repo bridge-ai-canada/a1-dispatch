@@ -1,6 +1,6 @@
 """Materials catalog + per-job material usage."""
 import uuid
-from typing import List, Optional
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 

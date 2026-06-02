@@ -14,9 +14,8 @@ Plug in a real bureau later by setting env:
 The current code will preserve the same `decide()` signature.
 """
 import os
-import math
 import logging
-from typing import Optional, Protocol
+from typing import Protocol
 
 logger = logging.getLogger("a1fieldpro.freshcash")
 

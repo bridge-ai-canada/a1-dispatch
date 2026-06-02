@@ -9,7 +9,7 @@ import hashlib
 import os
 import time
 import uuid
-from typing import Any, Optional
+from typing import Optional
 
 from cryptography.fernet import Fernet, InvalidToken
 

@@ -7,7 +7,7 @@ A single source of truth that drives:
 - Background sync scheduler
 """
 import os
-from typing import Literal, Optional
+from typing import Literal
 
 AuthMode = Literal["oauth2", "api_key", "server_to_server", "server_key", "api_token"]
 

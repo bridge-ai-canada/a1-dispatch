@@ -21,7 +21,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, HttpUrl
 
-from deps import db, get_current_user, logger, now_iso, log_activity
+from deps import db, get_current_user, now_iso, log_activity
 from services import webhook_emitter as emitter
 
 router = APIRouter()

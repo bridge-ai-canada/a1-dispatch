@@ -1,5 +1,4 @@
 """CRM module tests: customers, properties, equipment, communications, files, timeline, AI summary, tenant isolation."""
-import io
 import os
 import uuid
 import pytest

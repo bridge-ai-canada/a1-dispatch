@@ -126,8 +126,15 @@ async def stripe_webhook(request: Request):
     stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
     try:
         evt = await stripe_checkout.handle_webhook(body, sig)
+    except KeyError as e:
+        # Stripe SDK throws KeyError when payload structure is unexpected (e.g.
+        # non-Stripe POST or test ping without `data` field). Surface a clearer
+        # error message so we don't see bare "'data'" in logs.
+        logger.warning(f"Stripe webhook payload missing expected field {e}; "
+                       f"likely non-Stripe POST or unsupported event type")
+        raise HTTPException(status_code=400, detail="Malformed webhook payload")
     except Exception as e:
-        logger.error(f"Webhook error: {e}")
+        logger.error(f"Stripe webhook handling error: {type(e).__name__}: {e}")
         raise HTTPException(status_code=400, detail="Webhook handling failed")
     if evt.session_id:
         await db.payment_transactions.update_one(

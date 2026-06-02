@@ -9,8 +9,6 @@ Covers:
 - Tenants super-admin endpoints + 403 for owner
 """
 import os
-import io
-import re
 import pytest
 import requests
 from pathlib import Path

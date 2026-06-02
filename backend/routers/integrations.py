@@ -12,7 +12,6 @@ Endpoints:
 - GET    /api/integrations/sync-events              → recent sync log
 """
 import os
-import time
 from typing import Optional
 
 import httpx

@@ -35,7 +35,7 @@ async def ws_endpoint(websocket: WebSocket, token: str = Query(...)):
         import asyncio
         while True:
             try:
-                msg = await asyncio.wait_for(websocket.receive_text(), timeout=25.0)
+                await asyncio.wait_for(websocket.receive_text(), timeout=25.0)
                 # Client can send {"type":"pong"} or anything — we just keep the loop alive
             except asyncio.TimeoutError:
                 try:

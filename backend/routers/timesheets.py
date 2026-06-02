@@ -1,7 +1,7 @@
 """Time tracking: shift clock-in/out + per-job time logs."""
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, Literal
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 

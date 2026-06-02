@@ -1,7 +1,6 @@
 """Background tasks for geocoding + dashboard widgets."""
 import asyncio
 import logging
-from typing import Optional
 
 from deps import db, now_iso
 from geocode_service import geocode

@@ -293,7 +293,7 @@ class TestRecurringJobs:
         assert job["source"] == "recurring"
         assert job["recurring_id"] == rid
         assert job["title"] == "TEST_recur_runforce"
-        assert job["status"] == "scheduled"
+        assert job["status"] == "scheduled_installation"
 
         # verify the job exists via /jobs and recurring next_run_at advanced
         rec = demo_session.get(f"{API}/recurring-jobs", timeout=30).json()
@@ -450,7 +450,7 @@ class TestRouteOptimize:
                 "scheduled_at": (base + timedelta(hours=i * 2)).isoformat(),
                 "duration_min": dur,
                 "price": 100.0,
-                "status": "scheduled",
+                "status": "scheduled_installation",
             }, timeout=30)
             assert r.status_code in (200, 201), r.text
             ids.append(r.json()["id"])

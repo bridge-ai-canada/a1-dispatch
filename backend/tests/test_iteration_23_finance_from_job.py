@@ -68,15 +68,15 @@ def _create_job(client, price, phone="+15551112222", title_suffix=""):
 # -------------------- Tests --------------------
 class TestFinanceFromJob:
     def test_owner_create_basic(self, owner_client):
-        job = _create_job(owner_client, 1500.0)
+        job = _create_job(owner_client, 5500.0)
         r = owner_client.post(f"{BASE_URL}/api/financing/from-job",
                               json={"job_id": job["id"]}, timeout=30)
         assert r.status_code == 200, r.text
         data = r.json()
         assert "application_id" in data
         assert "public_token" in data and isinstance(data["public_token"], str) and len(data["public_token"]) > 10
-        assert float(data["amount"]) == 1500.0
-        assert int(data["term_months"]) == 36
+        assert float(data["amount"]) == 5500.0
+        assert int(data["term_months"]) in (36, 60)  # accepts either pre/post finance-programs default
         assert data["sms_result"] is None  # send_sms not set
 
         # Verify back-reference set on the job
@@ -85,7 +85,7 @@ class TestFinanceFromJob:
         assert r2.json().get("financing_application_id") == data["application_id"]
 
     def test_idempotent_same_job_returns_same_app(self, owner_client):
-        job = _create_job(owner_client, 2000.0, title_suffix="idem")
+        job = _create_job(owner_client, 6000.0, title_suffix="idem")
         a = owner_client.post(f"{BASE_URL}/api/financing/from-job",
                               json={"job_id": job["id"], "term_months": 48}, timeout=30)
         b = owner_client.post(f"{BASE_URL}/api/financing/from-job",
@@ -106,7 +106,7 @@ class TestFinanceFromJob:
         assert "min" in (r.json().get("detail") or "").lower()
 
     def test_amount_override_too_small_returns_400(self, owner_client):
-        job = _create_job(owner_client, 1500.0, title_suffix="override")
+        job = _create_job(owner_client, 6000.0, title_suffix="override")
         r = owner_client.post(f"{BASE_URL}/api/financing/from-job",
                               json={"job_id": job["id"], "amount": 250}, timeout=30)
         assert r.status_code == 400
@@ -118,16 +118,16 @@ class TestFinanceFromJob:
 
     def test_technician_can_create(self, owner_client, tech_client):
         """Critical: techs in the field MUST be able to call this."""
-        job = _create_job(owner_client, 1750.0, title_suffix="tech")
+        job = _create_job(owner_client, 5750.0, title_suffix="tech")
         r = tech_client.post(f"{BASE_URL}/api/financing/from-job",
                              json={"job_id": job["id"]}, timeout=30)
         assert r.status_code == 200, f"Tech denied: {r.status_code} {r.text}"
         data = r.json()
         assert data["application_id"]
-        assert float(data["amount"]) == 1750.0
+        assert float(data["amount"]) == 5750.0
 
     def test_send_sms_twilio_not_configured(self, owner_client):
-        job = _create_job(owner_client, 1500.0, phone="+15551234567", title_suffix="sms_ok")
+        job = _create_job(owner_client, 5500.0, phone="+15551234567", title_suffix="sms_ok")
         r = owner_client.post(f"{BASE_URL}/api/financing/from-job",
                               json={"job_id": job["id"], "send_sms": True,
                                     "origin_url": "https://example.com"}, timeout=30)
@@ -138,7 +138,7 @@ class TestFinanceFromJob:
         assert sms.get("error") == "twilio_not_configured"
 
     def test_send_sms_no_customer_phone(self, owner_client):
-        job = _create_job(owner_client, 1500.0, phone="", title_suffix="nophone")
+        job = _create_job(owner_client, 5500.0, phone="", title_suffix="nophone")
         r = owner_client.post(f"{BASE_URL}/api/financing/from-job",
                               json={"job_id": job["id"], "send_sms": True,
                                     "origin_url": "https://example.com"}, timeout=30)
@@ -149,11 +149,11 @@ class TestFinanceFromJob:
         assert sms.get("error") == "no_customer_phone"
 
     def test_custom_amount_overrides_job_price(self, owner_client):
-        job = _create_job(owner_client, 3000.0, title_suffix="custom_amt")
+        job = _create_job(owner_client, 8000.0, title_suffix="custom_amt")
         r = owner_client.post(f"{BASE_URL}/api/financing/from-job",
-                              json={"job_id": job["id"], "amount": 1200.0,
+                              json={"job_id": job["id"], "amount": 5200.0,
                                     "term_months": 24}, timeout=30)
         assert r.status_code == 200
         d = r.json()
-        assert float(d["amount"]) == 1200.0
+        assert float(d["amount"]) == 5200.0
         assert int(d["term_months"]) == 24

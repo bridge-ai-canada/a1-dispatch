@@ -8,7 +8,7 @@ import csv
 import io
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Literal
-from fastapi import APIRouter, Depends, Response, Query
+from fastapi import APIRouter, Depends, Response
 
 from deps import db, get_current_user
 

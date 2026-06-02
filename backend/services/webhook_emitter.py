@@ -10,11 +10,10 @@ import json
 import secrets
 import time
 import uuid
-from typing import Any
 
 import httpx
 
-from deps import db, logger, now_iso
+from deps import db, now_iso
 
 
 # Backoff intervals for retry attempts (seconds).

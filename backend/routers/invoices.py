@@ -10,12 +10,12 @@ from emergentintegrations.payments.stripe.checkout import (
 )
 
 from deps import (
-    db, logger, now_iso, FRONTEND_URL, STRIPE_API_KEY,
+    db, now_iso, FRONTEND_URL, STRIPE_API_KEY,
     get_current_user, log_activity,
     send_email, email_layout,
 )
 from billing import (
-    InvoiceIn, InvoiceUpdate, CheckoutPortalIn, compute_totals,
+    InvoiceIn, InvoiceUpdate, compute_totals,
 )
 from pdf_service import invoice_pdf
 

@@ -22,7 +22,6 @@ path that owns the push hook.
 import os
 import sys
 import uuid
-import time
 import pytest
 import requests
 from datetime import datetime, timezone, timedelta
@@ -327,7 +326,7 @@ class TestRecurringRunPushHook:
         job = r.json()
         assert job["recurring_id"] == rj_id
         assert job["assigned_to"] == scenario["tech_id"]
-        assert job["status"] == "scheduled"
+        assert job["status"] == "scheduled_installation"
         # endpoint stripped _id
         assert "_id" not in job
 
@@ -403,7 +402,7 @@ class TestLazyMaterializePushHook:
         mat = [j for j in jobs if j.get("recurring_id") == rj_id3]
         assert len(mat) >= 1, f"materialized job missing for {rj_id3}"
         assert mat[0]["assigned_to"] == scenario["tech_id"]
-        assert mat[0]["status"] == "scheduled"
+        assert mat[0]["status"] == "scheduled_installation"
         assert mat[0]["source"] == "recurring"
 
         # next_run_at should have advanced (no longer in the past)

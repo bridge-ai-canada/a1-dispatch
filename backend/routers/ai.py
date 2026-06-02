@@ -1,6 +1,6 @@
 """AI feature endpoints — all powered by ai_service."""
 import uuid
-from typing import Optional, List
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 

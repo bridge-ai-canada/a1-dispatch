@@ -3,8 +3,6 @@
 Each enabled integration with `supports_sync=True` has a periodic task that
 pulls/pushes deltas. Tasks degrade gracefully when creds are missing.
 """
-import asyncio
-from typing import Any
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 

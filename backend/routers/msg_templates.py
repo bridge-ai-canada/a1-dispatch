@@ -1,6 +1,6 @@
 """Email + SMS message templates (per-tenant). Variable substitution via whitelabel_service."""
 import uuid
-from typing import Optional, List, Literal
+from typing import Optional, Literal
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 

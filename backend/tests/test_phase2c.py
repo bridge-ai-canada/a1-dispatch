@@ -2,7 +2,6 @@
 import os
 import sys
 import uuid
-import asyncio
 import pytest
 import requests
 from unittest.mock import patch, MagicMock

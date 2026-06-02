@@ -3,20 +3,28 @@
 Uses pywebpush + self-signed VAPID. No 3rd-party account required.
 On 404/410 from the push service, the subscription is auto-removed (the user
 has uninstalled/blocked the app).
+
+Invalid VAPID keys are detected on first use and the module enters a
+"disabled" mode — we log ONCE and stop trying. Prevents log floods when the
+deployer ships the app with malformed VAPID keys (which is harmless: web push
+just won't work until they're regenerated).
 """
 import asyncio
 import json
 import logging
-from typing import Optional
 from pywebpush import webpush, WebPushException
 
 from deps import db, VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY, VAPID_SUBJECT
 
 logger = logging.getLogger("a1fieldpro.push")
 
+# Set to True after the FIRST failed deserialize so we don't log on every call.
+_VAPID_BROKEN = False
+
 
 def _send_one(subscription: dict, payload: dict) -> tuple[bool, int]:
-    if not VAPID_PRIVATE_KEY or not VAPID_PUBLIC_KEY:
+    global _VAPID_BROKEN
+    if _VAPID_BROKEN or not VAPID_PRIVATE_KEY or not VAPID_PUBLIC_KEY:
         return False, 0
     try:
         webpush(
@@ -34,6 +42,17 @@ def _send_one(subscription: dict, payload: dict) -> tuple[bool, int]:
         status = getattr(e.response, "status_code", 0) if e.response is not None else 0
         return False, status
     except Exception as e:
+        msg = str(e)
+        # Detect bad VAPID format and stop spamming the log.
+        if "deserialize" in msg or "ASN.1" in msg or "unsupported key type" in msg:
+            if not _VAPID_BROKEN:
+                _VAPID_BROKEN = True
+                logger.error(
+                    "VAPID_PRIVATE_KEY appears malformed — disabling web push for this process. "
+                    "Regenerate with `vapid --gen` (py-vapid) and update VAPID_PRIVATE_KEY in .env. "
+                    "Underlying error: %s", msg,
+                )
+            return False, 0
         logger.warning(f"web-push send failed: {e}")
         return False, 0
 

@@ -199,7 +199,16 @@ async def send_email(to: str, subject: str, html: str, *,
             email_id = res.get("id") if isinstance(res, dict) else None
             status = "sent" if email_id else "no_id"
         except Exception as e:
-            logger.error(f"Email send failed: {e}")
+            msg = str(e)
+            # Detect "domain not verified" so the deployer gets a clear hint.
+            if "verify a domain" in msg or "testing emails" in msg:
+                logger.error(
+                    "Resend domain not verified — cannot send to %s. "
+                    "Verify a domain at resend.com/domains and update SENDER_EMAIL in .env. "
+                    "Underlying: %s", to, msg,
+                )
+            else:
+                logger.error(f"Email send failed: {e}")
             status = "failed"
             error = f"{type(e).__name__}: {e}"
 

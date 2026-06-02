@@ -6,7 +6,6 @@ Without those, the endpoint falls back to dev-mode (immediate plan switch + log)
 Super-admin can override plan and trial status manually.
 """
 import os
-import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Literal
 from fastapi import APIRouter, HTTPException, Depends

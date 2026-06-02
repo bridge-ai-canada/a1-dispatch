@@ -4,7 +4,6 @@ Uses the real OpenAI integration via Emergent universal key.
 We assert response shape & status — not exact LLM content.
 """
 import os
-import time
 import uuid
 import pytest
 import requests
@@ -190,22 +189,26 @@ class TestMaintenance:
             assert it.get("status") == "pending"
 
     def test_dismiss_suggestion(self, owner_headers):
-        # Try dismissing any pending one. If none, create a fake doc via dismiss-of-nonexistent
-        # which should still 200 (update_one with no match is harmless per current impl).
+        # Endpoint returns 404 for unknown IDs (correct behavior). Only assert
+        # success if we actually have a pending suggestion to dismiss.
         r_list = requests.get(f"{API}/ai/maintenance/suggestions",
                               headers=owner_headers, timeout=20)
         items = r_list.json() if r_list.status_code == 200 else []
-        sid = items[0]["id"] if items else f"fake-{uuid.uuid4().hex}"
+        if not items:
+            r = requests.post(f"{API}/ai/maintenance/fake-id/dismiss",
+                              headers=owner_headers, timeout=15)
+            assert r.status_code == 404
+            return
+        sid = items[0]["id"]
         r = requests.post(f"{API}/ai/maintenance/{sid}/dismiss",
                           headers=owner_headers, timeout=15)
         assert r.status_code == 200
         assert r.json().get("ok") is True
-        # If we dismissed a real one, it should no longer appear
-        if items:
-            r2 = requests.get(f"{API}/ai/maintenance/suggestions",
-                              headers=owner_headers, timeout=20)
-            ids2 = [x["id"] for x in r2.json()]
-            assert sid not in ids2
+        # It should no longer appear in the list
+        r2 = requests.get(f"{API}/ai/maintenance/suggestions",
+                          headers=owner_headers, timeout=20)
+        ids2 = [x["id"] for x in r2.json()]
+        assert sid not in ids2
 
 
 # ------------------------- 7. Dispatcher assistant -------------------------

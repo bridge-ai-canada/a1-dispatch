@@ -13,7 +13,6 @@ Coverage:
 import os
 import sys
 import uuid
-import json
 import pytest
 import requests
 from pathlib import Path
