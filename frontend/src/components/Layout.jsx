@@ -7,7 +7,7 @@ import {
     ShieldCheck, ClockCounterClockwise, Buildings, EnvelopeSimple,
     ArrowsClockwise, ChartLine, Broadcast, FileText, Receipt, Stack, Sparkle,
     Kanban, PaintBrush, ChatText, CreditCard, Key, Globe, Bank, Plugs, Lightning,
-    MagnifyingGlass, CaretDown,
+    MagnifyingGlass, CaretDown, ListChecks,
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import api from "../lib/api";
@@ -38,6 +38,7 @@ const NAV_GROUPS = [
             { to: "/app/customers",  label: "Customers", icon: AddressBook, roles: ["owner","dispatcher","office_manager","csr","sales_rep"] },
             { to: "/app/estimates",  label: "Estimates", icon: FileText, roles: ["owner","dispatcher","office_manager","csr","sales_rep","accountant"] },
             { to: "/app/templates",  label: "Templates", icon: Stack, roles: ["owner","office_manager"] },
+            { to: "/app/checklists", label: "Checklists", icon: ListChecks, roles: ["owner","office_manager","dispatcher"] },
             { to: "/app/ai",         label: "AI Assistant", icon: Sparkle, roles: ["owner","dispatcher","office_manager"] },
         ],
     },

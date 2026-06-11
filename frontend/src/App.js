@@ -40,6 +40,7 @@ const Invoices           = lazy(() => import("./pages/Invoices"));
 const InvoiceBuilder     = lazy(() => import("./pages/InvoiceBuilder"));
 const InvoiceDetail      = lazy(() => import("./pages/InvoiceDetail"));
 const Templates          = lazy(() => import("./pages/Templates"));
+const Checklists         = lazy(() => import("./pages/Checklists"));
 const AICenter           = lazy(() => import("./pages/AICenter"));
 const Pipeline           = lazy(() => import("./pages/Pipeline"));
 const BrandingSettings   = lazy(() => import("./pages/BrandingSettings"));
@@ -146,6 +147,7 @@ function App() {
                         <Route path="invoices/:id" element={<InvoiceDetail />} />
                         <Route path="invoices/:id/edit" element={<InvoiceBuilder />} />
                         <Route path="templates" element={<Templates />} />
+                        <Route path="checklists" element={<Checklists />} />
                         <Route path="ai" element={<AICenter />} />
                         <Route path="pipeline" element={<Pipeline />} />
                         <Route path="notifications" element={<NotificationPrefs />} />

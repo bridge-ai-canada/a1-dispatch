@@ -126,3 +126,87 @@ async def toggle_item(job_id: str, body: ToggleIn, user: dict = Depends(get_curr
         raise HTTPException(status_code=404, detail="Checklist item not found")
     await db.jobs.update_one({"id": job_id}, {"$set": {"checklist": items}})
     return {"checklist": items}
+
+
+# -------------------- Per-job checklist editing (no template impact) --------------------
+class JobChecklistItemIn(BaseModel):
+    title: str
+    required: bool = False
+
+
+class JobChecklistItemPatch(BaseModel):
+    title: Optional[str] = None
+    required: Optional[bool] = None
+
+
+async def _get_job_or_404(job_id: str, company_id: str) -> dict:
+    job = await db.jobs.find_one({"id": job_id, "company_id": company_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+
+@router.get("/jobs/{job_id}/checklist")
+async def get_job_checklist(job_id: str, user: dict = Depends(get_current_user)):
+    job = await _get_job_or_404(job_id, user["company_id"])
+    return {"checklist": job.get("checklist") or []}
+
+
+@router.post("/jobs/{job_id}/checklist/items")
+async def add_job_checklist_item(job_id: str, body: JobChecklistItemIn, user: dict = Depends(get_current_user)):
+    job = await _get_job_or_404(job_id, user["company_id"])
+    items = list(job.get("checklist") or [])
+    new_item = {
+        "id": str(uuid.uuid4()),
+        "title": body.title.strip(),
+        "required": bool(body.required),
+        "completed": False,
+        "completed_at": None,
+        "completed_by": None,
+    }
+    if not new_item["title"]:
+        raise HTTPException(status_code=400, detail="Title required")
+    items.append(new_item)
+    await db.jobs.update_one({"id": job_id}, {"$set": {"checklist": items}})
+    return {"checklist": items}
+
+
+@router.put("/jobs/{job_id}/checklist/items/{item_id}")
+async def update_job_checklist_item(
+    job_id: str, item_id: str, body: JobChecklistItemPatch, user: dict = Depends(get_current_user),
+):
+    job = await _get_job_or_404(job_id, user["company_id"])
+    items = list(job.get("checklist") or [])
+    patch = body.dict(exclude_none=True)
+    for it in items:
+        if it.get("id") == item_id:
+            if "title" in patch:
+                title = patch["title"].strip()
+                if not title:
+                    raise HTTPException(status_code=400, detail="Title cannot be empty")
+                it["title"] = title
+            if "required" in patch:
+                it["required"] = bool(patch["required"])
+            break
+    else:
+        raise HTTPException(status_code=404, detail="Checklist item not found")
+    await db.jobs.update_one({"id": job_id}, {"$set": {"checklist": items}})
+    return {"checklist": items}
+
+
+@router.delete("/jobs/{job_id}/checklist/items/{item_id}")
+async def delete_job_checklist_item(job_id: str, item_id: str, user: dict = Depends(get_current_user)):
+    job = await _get_job_or_404(job_id, user["company_id"])
+    items = list(job.get("checklist") or [])
+    new_items = [it for it in items if it.get("id") != item_id]
+    if len(new_items) == len(items):
+        raise HTTPException(status_code=404, detail="Checklist item not found")
+    await db.jobs.update_one({"id": job_id}, {"$set": {"checklist": new_items}})
+    return {"checklist": new_items}
+
+
+@router.delete("/jobs/{job_id}/checklist")
+async def clear_job_checklist(job_id: str, user: dict = Depends(get_current_user)):
+    await _get_job_or_404(job_id, user["company_id"])
+    await db.jobs.update_one({"id": job_id}, {"$set": {"checklist": []}})
+    return {"checklist": []}

@@ -2,34 +2,85 @@
     "expo": {
         "name": "A1 Field Pro",
         "slug": "a1-field-pro",
+        "owner": "a1fieldpro",
         "version": "1.0.0",
         "orientation": "portrait",
         "icon": "./assets/icon.png",
         "scheme": "a1fieldpro",
         "userInterfaceStyle": "automatic",
         "splash": {
-            "image": "./assets/icon.png",
+            "image": "./assets/splash.png",
             "resizeMode": "contain",
             "backgroundColor": "#0F172A"
         },
         "assetBundlePatterns": ["**/*"],
         "ios": {
             "supportsTablet": true,
-            "bundleIdentifier": "com.a1fieldpro.mobile"
+            "bundleIdentifier": "com.a1fieldpro.mobile",
+            "buildNumber": "1",
+            "infoPlist": {
+                "NSCameraUsageDescription": "Take before/after photos of job sites and capture customer signatures.",
+                "NSPhotoLibraryUsageDescription": "Attach existing photos to work orders.",
+                "NSLocationWhenInUseUsageDescription": "Route you to job locations and check you in to jobs you're working on.",
+                "NSLocationAlwaysAndWhenInUseUsageDescription": "Optionally track travel time and route between jobs while you are on the clock.",
+                "NSMicrophoneUsageDescription": "Record voice notes during a job.",
+                "ITSAppUsesNonExemptEncryption": false
+            }
         },
         "android": {
             "adaptiveIcon": {
-                "foregroundImage": "./assets/icon.png",
+                "foregroundImage": "./assets/adaptive-icon.png",
                 "backgroundColor": "#1D4ED8"
             },
-            "package": "com.a1fieldpro.mobile"
+            "package": "com.a1fieldpro.mobile",
+            "versionCode": 1,
+            "permissions": [
+                "CAMERA",
+                "READ_EXTERNAL_STORAGE",
+                "WRITE_EXTERNAL_STORAGE",
+                "ACCESS_FINE_LOCATION",
+                "ACCESS_COARSE_LOCATION",
+                "RECORD_AUDIO",
+                "VIBRATE",
+                "RECEIVE_BOOT_COMPLETED",
+                "POST_NOTIFICATIONS"
+            ],
+            "blockedPermissions": [
+                "READ_CONTACTS",
+                "READ_PHONE_STATE"
+            ]
         },
-        "plugins": ["expo-router", "expo-secure-store"],
+        "plugins": [
+            "expo-router",
+            "expo-secure-store",
+            [
+                "expo-image-picker",
+                {
+                    "photosPermission": "A1 Field Pro accesses your photos to attach images to work orders.",
+                    "cameraPermission": "A1 Field Pro uses the camera to take job site photos."
+                }
+            ],
+            [
+                "expo-location",
+                {
+                    "locationAlwaysAndWhenInUsePermission": "Allow A1 Field Pro to use your location to route you to jobs."
+                }
+            ]
+        ],
         "experiments": {
             "typedRoutes": true
         },
         "extra": {
-            "apiUrl": "https://a1-dispatch.preview.emergentagent.com"
+            "apiUrl": "https://a1-dispatch.preview.emergentagent.com",
+            "eas": {
+                "projectId": "REPLACE_WITH_EAS_PROJECT_ID_AFTER_eas_init"
+            }
+        },
+        "runtimeVersion": {
+            "policy": "appVersion"
+        },
+        "updates": {
+            "url": "https://u.expo.dev/REPLACE_WITH_EAS_PROJECT_ID_AFTER_eas_init"
         }
     }
 }

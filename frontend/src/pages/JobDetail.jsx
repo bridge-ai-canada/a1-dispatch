@@ -9,6 +9,7 @@ import {
     Bank, Copy, ChatText, X,
 } from "@phosphor-icons/react";
 import { AIPolishButton, AIActionButton } from "../components/AIAssist";
+import JobChecklistPanel from "../components/JobChecklistPanel";
 
 const STATUS_NEXT = {
     unscheduled: { label: "Schedule", next: "scheduled_installation" },
@@ -178,6 +179,8 @@ export default function JobDetail() {
                     </section>
 
                     <UpsellSuggestion jobId={id} />
+
+                    <JobChecklistPanel job={job} onChange={setJob} />
 
                     <section className="border border-slate-200">
                         <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">

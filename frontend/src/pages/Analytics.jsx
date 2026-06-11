@@ -63,6 +63,24 @@ export default function Analytics() {
         } catch (e) { toast.error("Export failed"); }
     };
 
+    const downloadPdf = async (report) => {
+        try {
+            const url = `${API_BASE}/analytics/export.pdf?report=${report}&start=${encodeURIComponent(params.start)}&end=${encodeURIComponent(params.end)}${branchId ? `&branch_id=${branchId}` : ""}`;
+            const token = localStorage.getItem("a1.token") || "";
+            const res = await fetch(url, {
+                credentials: "include",
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
+            if (!res.ok) throw new Error("Export failed");
+            const blob = await res.blob();
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `a1-${report}-${start}-to-${end}.pdf`;
+            a.click();
+            toast.success("PDF downloaded");
+        } catch (e) { toast.error("PDF export failed"); }
+    };
+
     const TabIcon = TABS.find((t) => t.key === tab)?.icon || ChartLine;
 
     return (
@@ -89,13 +107,30 @@ export default function Analytics() {
                             {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </select>
                     )}
-                    {["revenue","technicians","marketing","financing","leaderboard"].includes(tab === "techs" ? "technicians" : tab === "memberships" ? null : tab === "overview" ? null : tab) && (
-                        <button onClick={() => downloadCsv(tab === "techs" ? "technicians" : tab)}
-                            className="h-10 px-4 rounded-lg bg-slate-900 text-white text-sm font-bold inline-flex items-center gap-2"
-                            data-testid="analytics-export-btn">
-                            <DownloadSimple size={14}/> Export CSV
-                        </button>
-                    )}
+                    {(() => {
+                        // Map tab -> report key
+                        const reportKey = tab === "techs" ? "technicians" : tab;
+                        const pdfTabs = ["overview","revenue","technicians","marketing","financing","leaderboard"];
+                        const csvTabs = ["revenue","technicians","marketing","financing","leaderboard"];
+                        return (
+                            <>
+                                {pdfTabs.includes(reportKey) && (
+                                    <button onClick={() => downloadPdf(reportKey)}
+                                        className="h-10 px-4 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold inline-flex items-center gap-2"
+                                        data-testid="analytics-export-pdf">
+                                        <DownloadSimple size={14}/> PDF
+                                    </button>
+                                )}
+                                {csvTabs.includes(reportKey) && (
+                                    <button onClick={() => downloadCsv(reportKey)}
+                                        className="h-10 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold inline-flex items-center gap-2"
+                                        data-testid="analytics-export-btn">
+                                        <DownloadSimple size={14}/> CSV
+                                    </button>
+                                )}
+                            </>
+                        );
+                    })()}
                 </div>
             </header>
 
