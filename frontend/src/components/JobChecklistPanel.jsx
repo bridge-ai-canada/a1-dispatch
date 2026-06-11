@@ -4,6 +4,9 @@ import { toast } from "sonner";
 import {
     ListChecks, Plus, Check, Trash, PencilSimple, FloppyDisk, X,
 } from "@phosphor-icons/react";
+import {
+    Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+} from "./ui/select";
 
 /**
  * Per-job checklist panel.
@@ -21,13 +24,22 @@ export default function JobChecklistPanel({ job, onChange }) {
     const [newItemRequired, setNewItemRequired] = useState(false);
     const [editing, setEditing] = useState(null); // item.id
 
-    useEffect(() => {
-        if (items.length > 0) return;
+    const loadTemplates = async () => {
         setLoadingTpls(true);
-        api.get("/checklist-templates")
-            .then(({ data }) => setTemplates(data))
-            .catch(() => {})
-            .finally(() => setLoadingTpls(false));
+        try {
+            const { data } = await api.get("/checklist-templates");
+            setTemplates(data);
+        } catch {
+            // ignore — templates are optional
+        } finally {
+            setLoadingTpls(false);
+        }
+    };
+
+    useEffect(() => {
+        if (items.length === 0) {
+            loadTemplates();
+        }
     }, [items.length]);
 
     const refresh = (data) => {
@@ -125,19 +137,25 @@ export default function JobChecklistPanel({ job, onChange }) {
                     <p className="text-sm text-slate-500">No checklist on this job yet.</p>
                     {templates.length > 0 ? (
                         <div className="flex flex-col sm:flex-row gap-2">
-                            <select
-                                value={selectedTpl}
-                                onChange={(e) => setSelectedTpl(e.target.value)}
-                                className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm bg-white"
-                                data-testid="checklist-template-select"
-                            >
-                                <option value="">— Pick a template —</option>
-                                {templates.map((t) => (
-                                    <option key={t.id} value={t.id}>
-                                        {t.name}{t.job_type ? ` (${t.job_type})` : ""} · {(t.items || []).length} items
-                                    </option>
-                                ))}
-                            </select>
+                            <Select value={selectedTpl} onValueChange={setSelectedTpl}>
+                                <SelectTrigger
+                                    className="flex-1 h-10 bg-white"
+                                    data-testid="checklist-template-select"
+                                >
+                                    <SelectValue placeholder="— Pick a template —" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {templates.map((t) => (
+                                        <SelectItem
+                                            key={t.id}
+                                            value={t.id}
+                                            data-testid={`checklist-template-option-${t.id}`}
+                                        >
+                                            {t.name}{t.job_type ? ` (${t.job_type})` : ""} · {(t.items || []).length} items
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                             <button
                                 onClick={apply}
                                 disabled={!selectedTpl}

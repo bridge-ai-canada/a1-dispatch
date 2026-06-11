@@ -20,7 +20,7 @@ from middleware import (
 )
 from perf import SlowRequestLoggerMiddleware
 from observability import init_sentry
-from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates, timesheets, checklists, materials, ai, sms, branding, branches, msg_templates, subscription, tenants, api_keys, financing, analytics, integrations as integrations_router, webhooks as webhooks_router, health as health_router
+from routers import auth, admin, companies, customers, jobs, payments, public_routes, portal, recurring, exports, routes_opt, push, dispatch, dashboard, estimates, invoices, proposal_templates, timesheets, checklists, materials, ai, sms, branding, branches, msg_templates, subscription, tenants, api_keys, financing, analytics, integrations as integrations_router, webhooks as webhooks_router, health as health_router, legal
 from services import sync_engine
 from migrations import runner as migration_runner
 
@@ -38,6 +38,7 @@ api.include_router(customers.router)
 api.include_router(jobs.router)
 api.include_router(payments.router)
 api.include_router(public_routes.router)
+api.include_router(legal.router)
 api.include_router(portal.router)
 api.include_router(recurring.router)
 api.include_router(exports.router)

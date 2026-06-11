@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 32 validation of (1) /api/legal/{privacy,terms} HTML + .txt routes, (2) log_activity emission on per-job checklist mutations (add/update/delete/clear), (3) frontend migration of JobChecklistPanel native <select>→shadcn Select. Backend pytest 16/16 PASS (file: /app/backend/tests/test_iteration_32_legal_activity.py, junit: /app/test_reports/pytest/iteration_32_results.xml). Iteration 31 regression suite re-run 14/14 PASS in the same session. Legal endpoints verified: GET /api/legal/privacy returns 200 text/html with '<title>Privacy Policy · A1 Field Pro</title>' and HTML-escaped '&amp;' for the 2 '&' chars in the source markdown; backend Cache-Control: 'public, max-age=3600' confirmed via direct localhost:8001 hit (NOTE: public preview ingress/cloudflare overrides with 'no-store, no-cache, must-revalidate' — env-level, not an app bug). /api/legal/terms returns 200 HTML with 'Terms of Service' present. /api/legal/{privacy,terms}.txt return 200 text/plain;charset=utf-8 starting with '# Privacy Policy' / '# Terms of Service'. /api/legal/nonexistent returns 404. Activity log audit trail confirmed: after POST/PUT/DELETE on /api/jobs/{id}/checklist/items and DELETE /api/jobs/{id}/checklist, db.activity has rows with action='job.checklist.item.added|updated|removed' and 'job.checklist.cleared' with meta.removed_count matching items wiped. Analytics PDF export still %PDF magic + >800B for all 6 reports. Frontend playwright run (demo owner): logged in, navigated to /app/jobs/{seed_job_id}, JobChecklistPanel rendered with data-testid='job-checklist-panel', ZERO '<span> cannot be a child of <option>' console warnings (migration eliminated them — previously logged as iter-31 cosmetic warning). Cleared existing checklist, opened shadcn Select via [data-testid=checklist-template-select], saw 3 [data-testid^=checklist-template-option-] entries in radix portal, selected one, clicked Apply → 2 rows rendered. Toggled first row (state flipped), added new row 'TEST_E2E_added_row' via checklist-new-item-input + checklist-add-row-button (count went 2→3), inline-edited via checklist-edit-row-{id} → checklist-edit-input-{id} → checklist-save-edit-{id}, row text became 'TEST_E2E_renamed_row'. /app/checklists page still renders with new-checklist-button that opens checklist-editor-modal. Zero blocking bugs.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/legal/*", "issue": "Backend correctly returns 'Cache-Control: public, max-age=3600' (verified via localhost:8001), but the preview ingress (cloudflare) rewrites it to 'no-store, no-cache, must-revalidate' on the public URL. This means clients/CDNs on the public domain will not cache the legal pages. App code is correct; this is an infra/proxy configuration concern only — likely intentional for the preview env but worth verifying for the prod ingress before Play Store submission since Google may re-fetch the pages frequently."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_32_legal_activity.py",
+    "/app/backend/tests/test_iteration_31_checklists_pdf.py",
+    "/app/test_reports/pytest/iteration_32_results.xml"
+  ],
+  "action_items": [
+    "(Optional infra) Verify that the production ingress preserves 'Cache-Control: public, max-age=3600' on /api/legal/* responses — currently the preview cloudflare layer strips it. Backend code is fine; just an ingress rule to confirm before Play Store submission."
+  ],
+  "critical_code_review_comments": [
+    "/app/backend/routers/legal.py uses lru_cache on _load(slug) but the cached html bakes in datetime.now() into the body as a 'Effective' marker via md.replace('[DATE]', today). Because the cache key is just slug, the effective-date string is frozen at first-load forever (until process restart). For a 1-hour Cache-Control window this is fine, but if the app runs for days, the displayed date will drift. Recommend either: (a) remove lru_cache and compute fresh on each request (HTML render is ~ms cheap), or (b) move the date stamping into the response layer (legal_html function) so only the markdown→HTML conversion is cached.",
+    "/app/backend/routers/legal.py: legal_text reads the file fresh on every call (no lru_cache), but legal_html caches the rendered output indefinitely. Inconsistent caching strategy. Recommend matching behavior.",
+    "/app/backend/routers/legal.py _md_to_html is a custom mini-markdown parser. It works for the maintained docs, but if a future contributor adds tables, blockquotes, fenced code blocks, or numbered lists, they will render incorrectly. Consider a one-line dependency (markdown or markdown-it-py from pip) to future-proof — or document in the file header the supported subset.",
+    "Activity-log volume concern: every checklist item add/edit/remove writes one db.activity doc. On a busy company toggling many items per job, this could grow db.activity quickly. There's already an index on (company_id, created_at) so query perf is fine, but consider TTL or archival policy for activity rows older than ~90 days.",
+    "JobChecklistPanel.jsx: loadTemplates() is now async but is invoked unawaited inside useEffect (line 41). Works fine because the function handles its own setState, but a follow-up that wants to chain logic after templates load (e.g., auto-open the select if there's only one template) won't be able to await it. Minor — current behavior is correct."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration_32_legal_activity.py (NEW — 16 test cases covering legal endpoints, checklist activity-log audit trail, and PDF export regression)"
+  ],
+  "success_rate": {
+    "backend": "100% (16/16 iter32 + 14/14 iter31 regression = 30/30)",
+    "frontend": "100% (all 12 critical flows in the iter32 task spec verified end-to-end)"
+  },
+  "test_credentials": "Owner: demo@a1fieldpro.com / Demo1234! (MFA disabled by seed).",
+  "seed_data_creation": "Ephemeral TEST_act_<hex> checklist templates created and torn down per-test. One persistent UI-side 'TEST_E2E_renamed_row' item now lives on the demo seed job's checklist (visible on /app/jobs/{seed_job_id}) — harmless, can be removed via the UI clear button if needed.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 32 is GREEN. Run: REACT_APP_BACKEND_URL=https://a1-dispatch.preview.emergentagent.com pytest /app/backend/tests/test_iteration_32_legal_activity.py /app/backend/tests/test_iteration_31_checklists_pdf.py -v. New endpoints: GET /api/legal/{privacy,terms}[.txt] (public, no auth). Activity log collection is db.activity; query via session.get(API+'/activity?action=...&limit=...') returns a list ordered newest first. data-testids in JobChecklistPanel post-migration: checklist-template-select (shadcn trigger button), checklist-template-option-{tpl_id} (radix portal SelectItem — found via page.query_selector_all('[data-testid^=checklist-template-option-]') after clicking the trigger). The previously reported '<span> cannot be a child of <option>' hydration warning is GONE because there is no <option> tag anymore (radix renders divs with role=option). To dismiss native confirm() dialogs for Clear/Remove, register: page.on('dialog', lambda d: d.accept()). Public ingress strips Cache-Control on /api/legal/* responses — verify backend headers via direct localhost:8001 hits.",
+  "rca of the issue": "No application bugs found. One env-level finding only: the cloudflare layer in front of the preview URL rewrites the backend-set 'Cache-Control: public, max-age=3600' header to 'no-store, no-cache, must-revalidate'. Reproduction: curl -sI http://localhost:8001/api/legal/privacy → shows 'cache-control: public, max-age=3600'; curl -sI https://a1-dispatch.preview.emergentagent.com/api/legal/privacy → shows 'cache-control: no-store, no-cache, must-revalidate'. Mitigation: verify prod ingress (NOT preview cloudflare) does not apply the same override before Play Store submission; if it does, configure the prod ingress to honor upstream Cache-Control on /api/legal/* paths."
+}

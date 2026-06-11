@@ -168,6 +168,8 @@ async def add_job_checklist_item(job_id: str, body: JobChecklistItemIn, user: di
         raise HTTPException(status_code=400, detail="Title required")
     items.append(new_item)
     await db.jobs.update_one({"id": job_id}, {"$set": {"checklist": items}})
+    await log_activity(user, "job.checklist.item.added", "job", job_id,
+                       {"item_id": new_item["id"], "title": new_item["title"], "required": new_item["required"]})
     return {"checklist": items}
 
 
@@ -191,6 +193,8 @@ async def update_job_checklist_item(
     else:
         raise HTTPException(status_code=404, detail="Checklist item not found")
     await db.jobs.update_one({"id": job_id}, {"$set": {"checklist": items}})
+    await log_activity(user, "job.checklist.item.updated", "job", job_id,
+                       {"item_id": item_id, "patch": patch})
     return {"checklist": items}
 
 
@@ -202,11 +206,15 @@ async def delete_job_checklist_item(job_id: str, item_id: str, user: dict = Depe
     if len(new_items) == len(items):
         raise HTTPException(status_code=404, detail="Checklist item not found")
     await db.jobs.update_one({"id": job_id}, {"$set": {"checklist": new_items}})
+    await log_activity(user, "job.checklist.item.removed", "job", job_id,
+                       {"item_id": item_id})
     return {"checklist": new_items}
 
 
 @router.delete("/jobs/{job_id}/checklist")
 async def clear_job_checklist(job_id: str, user: dict = Depends(get_current_user)):
-    await _get_job_or_404(job_id, user["company_id"])
+    job = await _get_job_or_404(job_id, user["company_id"])
+    count = len(job.get("checklist") or [])
     await db.jobs.update_one({"id": job_id}, {"$set": {"checklist": []}})
+    await log_activity(user, "job.checklist.cleared", "job", job_id, {"removed_count": count})
     return {"checklist": []}
