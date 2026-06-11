@@ -141,6 +141,9 @@ def _md_to_html(md: str) -> str:
 
 @lru_cache(maxsize=8)
 def _load(slug: str) -> tuple[str, str]:
+    """Load and convert markdown to HTML. Cached because the conversion is the
+    expensive part. The effective-date is injected per-request in legal_html()
+    so the cached body has a stable {effective} placeholder."""
     if slug not in LEGAL_DOCS:
         raise FileNotFoundError(slug)
     fname, title = LEGAL_DOCS[slug]
@@ -149,8 +152,9 @@ def _load(slug: str) -> tuple[str, str]:
         raise FileNotFoundError(path)
     with open(path, "r", encoding="utf-8") as f:
         md = f.read()
-    today = datetime.now(timezone.utc).strftime("%B %Y")
-    md = md.replace("[DATE]", today)
+    # Strip lines containing the static [DATE] markers — the page header
+    # already shows the live effective date.
+    md = "\n".join(ln for ln in md.splitlines() if "[DATE]" not in ln)
     return title, _md_to_html(md)
 
 

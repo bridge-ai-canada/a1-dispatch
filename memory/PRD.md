@@ -545,11 +545,13 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - Mapbox/Google fallback for Nominatim 429 — wired, awaiting `MAPBOX_ACCESS_TOKEN` or `GOOGLE_MAPS_API_KEY`.
 - Apple login (needs Apple Developer credentials).
 
-### Implemented Feb 11, 2026 (iteration 31 — this session)
+### Implemented Feb 11, 2026 (iterations 31–32 — this session)
 - **P0 Play Store hardening** — `mobile/app.json` now includes Android permissions, versionCode, bundle id, iOS infoPlist usage strings, EAS project placeholder, OTA updates URL placeholder, and runtimeVersion policy.
-- **P1 Web UI for Checklists** — `/app/checklists` page (CRUD master templates) + `JobChecklistPanel` component embedded on JobDetail. Supports apply-from-template, toggle, and per-job add/edit/delete that does NOT mutate the master.
-- **P1 Per-job checklist editing backend** — `GET/POST /api/jobs/{job_id}/checklist`, `POST/PUT/DELETE /api/jobs/{job_id}/checklist/items[/{item_id}]`, `DELETE /api/jobs/{job_id}/checklist` (clear). Tenant-isolated and audited.
+- **P1 Web UI for Checklists** — `/app/checklists` page (CRUD master templates) + `JobChecklistPanel` component embedded on JobDetail. Supports apply-from-template, toggle, and per-job add/edit/delete that does NOT mutate the master. Native `<select>` migrated to shadcn/ui Select (eliminates HTML hydration warning).
+- **P1 Per-job checklist editing backend** — `GET/POST /api/jobs/{job_id}/checklist`, `POST/PUT/DELETE /api/jobs/{job_id}/checklist/items[/{item_id}]`, `DELETE /api/jobs/{job_id}/checklist` (clear). Tenant-isolated; **emits `job.checklist.item.added|updated|removed` and `job.checklist.cleared` activity entries**.
 - **P2 Analytics PDF export** — `GET /api/analytics/export.pdf?report=<overview|revenue|technicians|marketing|financing|leaderboard>` via reportlab. Wired to Analytics page with PDF + CSV buttons.
+- **Play Store legal docs** — `GET /api/legal/privacy` + `/api/legal/terms` (styled HTML, brand gradient header) and `.txt` variants. New `/app/docs/templates/TERMS_OF_SERVICE.md` source document. Required for Google Play Console "App content → Privacy policy" field.
+- **Mobile asset generator** — `/app/scripts/generate_mobile_assets.py` produces brand-aligned PNG placeholders (1024×1024 icon, 1024×1024 adaptive-icon with 70 % safe zone, 1284×2778 splash, 48×48 favicon, 1024×500 Play feature graphic). All emitted into `/app/mobile/assets/`. Replace with designer assets before launch.
 
 ### P2 — Future
 - Android login (needs Google Play Developer credentials)
