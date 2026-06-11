@@ -545,6 +545,12 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - Mapbox/Google fallback for Nominatim 429 — wired, awaiting `MAPBOX_ACCESS_TOKEN` or `GOOGLE_MAPS_API_KEY`.
 - Apple login (needs Apple Developer credentials).
 
+### Implemented Feb 11, 2026 (iteration 31 — this session)
+- **P0 Play Store hardening** — `mobile/app.json` now includes Android permissions, versionCode, bundle id, iOS infoPlist usage strings, EAS project placeholder, OTA updates URL placeholder, and runtimeVersion policy.
+- **P1 Web UI for Checklists** — `/app/checklists` page (CRUD master templates) + `JobChecklistPanel` component embedded on JobDetail. Supports apply-from-template, toggle, and per-job add/edit/delete that does NOT mutate the master.
+- **P1 Per-job checklist editing backend** — `GET/POST /api/jobs/{job_id}/checklist`, `POST/PUT/DELETE /api/jobs/{job_id}/checklist/items[/{item_id}]`, `DELETE /api/jobs/{job_id}/checklist` (clear). Tenant-isolated and audited.
+- **P2 Analytics PDF export** — `GET /api/analytics/export.pdf?report=<overview|revenue|technicians|marketing|financing|leaderboard>` via reportlab. Wired to Analytics page with PDF + CSV buttons.
+
 ### P2 — Future
 - Android login (needs Google Play Developer credentials)
 - Booking-confirmation email back to customers
@@ -555,8 +561,10 @@ Testing: backend regression + 26 new targeted cases — 115 pass / 0 critical is
 - WS heartbeat / ping-pong for ultra-long sessions through aggressive ingress idle-kill
 - Per-branch dashboards drill-down + branch-scoped technician routing
 - Custom invoice PDF templates (e.g. Good/Better/Best layouts) per tenant
-- Webhook subscriptions per tenant (companion to API keys)
 - Tenant-scoped audit log search UI (system + branding + subscription events)
+- Activity-log entries for per-job checklist edits (currently only template CRUD is logged)
+- HTML-escape KPI values in PDF generator (defensive hardening)
+- Migrate native `<select>` in JobChecklistPanel to shadcn/ui Select to silence preview-only hydration warning
 
 ## Demo credentials
 Owner: `demo@a1fieldpro.com` / `Demo1234!`
